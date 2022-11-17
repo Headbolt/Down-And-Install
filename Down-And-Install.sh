@@ -18,12 +18,15 @@
 #
 # HISTORY
 #
-#   Version: 1.1 - 15/11/2022
+#   Version: 1.2 - 17/11/2022
 #
 #	05/10/2022 - V1.0 - Created by Headbolt
 #
 #	15/11/2022 - V1.1 - Updated by Headbolt
-#							Legislating for "Hotlink's that always point at the latest version"
+#							Legislating for "Hotlink's" that always point at the latest version
+#
+#	17/11/2022 - V1.2 - Updated by Headbolt
+#							Legislating for Installers that are Application Suites
 #
 ###############################################################################################################################################
 #
@@ -188,7 +191,28 @@ AppPath=$(/bin/echo $AppName.app ) # Translate into the full App name for the at
 /bin/echo # Outputting a Blank Line for Reporting Purposes
 /bin/echo 'Clearing Attriubtes on Installed App'
 /bin/echo 'Running Command "xattr -rc /Applications/'$AppPath'"'
-xattr -rc "/Applications/$AppPath" # Clear Attriubtes on Installed App
+AppOutput=$( xattr -rc "/Applications/$AppPath" 2>&1 ) # Clear Attriubtes on Installed App
+#
+if [[ "$AppOutput" == *"No such file"* ]] # Error Check incase installer App is a Suite
+	then
+		/bin/echo # Outputting a Blank Line for Reporting Purposes
+        /bin/echo '"No such file" error, assuming "'$AppName'" is a Suite'
+        /bin/echo # Outputting a Blank Line for Reporting Purposes
+        /bin/echo '"Checking each App inside "'$AppName'" and attempting to clear Attriubtes'
+        /bin/echo # Outputting a Blank Line for Reporting Purposes
+		cat "/tmp/$DownloadFileName/temp/Distribution" | grep 'title=' | sed -e 's/.*title="\([^"]*\)".*/\1/g' | while read IndividualApp
+			do
+            	/bin/echo # Outputting a Blank Line for Reporting Purposes
+            	/bin/echo 'Running Command "xattr -rc /Applications/'$IndividualApp.app'"'
+				IndividualAppOutput=$( xattr -rc "/Applications/$IndividualApp.app" 2>&1 ) # Clear Attriubtes on Individual Installed App
+                if [[ "$IndividualAppOutput" == *"No such file"* ]] # Result Check
+					then
+                    	/bin/echo '"No such file" error'
+					else
+                    	/bin/echo 'OK'
+				fi
+			done  
+fi
 #
 }
 #
@@ -248,14 +272,6 @@ SectionEnd
 #
 Download
 SectionEnd
-#
-#if [ $Hotlink == "YES" ] # If link is a "HotLink" set a default name for Working Folder
-#	then
-#		pkgutil --expand $DownloadFile "/tmp/$DownloadFileName/temp" # Extract a copy of the app
-#		DownloadFile=$(ls "/tmp/$DownloadFileName/temp/" | grep "$ExpectedAppFromHotlink" )
-#		pkgInstall
-#		SectionEnd
-#fi
 #
 if [ $DownloadExt == "zip" ] # check if the installer needs unzipping
 	then
