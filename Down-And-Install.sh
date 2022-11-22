@@ -18,7 +18,7 @@
 #
 # HISTORY
 #
-#   Version: 1.2 - 17/11/2022
+#   Version: 1.3 - 22/11/2022
 #
 #	05/10/2022 - V1.0 - Created by Headbolt
 #
@@ -28,6 +28,10 @@
 #	17/11/2022 - V1.2 - Updated by Headbolt
 #							Legislating for Installers that are Application Suites
 #
+#	22/11/2022 - V1.3 - Updated by Headbolt
+#							Legislating for DMG downloads, and direct .app's as well as .app's 
+#							That are Installers
+#
 ###############################################################################################################################################
 #
 #   DEFINE VARIABLES & READ IN PARAMETERS
@@ -35,10 +39,12 @@
 ###############################################################################################################################################
 #
 DownloadURL=$4 # Grab the Download URL for the installer from JAMF variable #4 eg. https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/SophosInstall.zip
-AppInstallerCommand=$5 # Grab the Install Command, if needed from JAMF variable #5 eg. Sophos Installer
+AppInstallerCommand=$5 # Grab the Install Command, if needed from JAMF variable #5 eg. /Contents/MacOS/Sophos\ Installer
 AppInstallerSwitches=$6  # Grab the Installer Switches, if needed from JAMF variable #6 eg. --quiet
 #
 ScriptName="Application | Download and Install"
+MountVolume="" # Ensure The Mount Volume Variable is Blank at the outset
+PreMountedFileName="" # Ensure The PreMountedFileName Variable is Blank at the outset
 ExitCode=0
 #
 ###############################################################################################################################################
@@ -149,17 +155,83 @@ unzip $DownloadFile
 #
 ###############################################################################################################################################
 #
+# Image Mount Function
+#
+ImageMount(){
+#
+/bin/echo 'Mounting Image File "'$DownloadFile'"'
+/bin/echo # Outputting a Blank Line for Reporting Purposes
+/bin/echo 'Running Command "'/usr/bin/hdiutil mount -private -noautoopen -noverify "'$DownloadFile'" -shadow'"'
+/bin/echo # Outputting a Blank Line for Reporting Purposes
+#
+MountOutput=$( /usr/bin/hdiutil mount -private -noautoopen -noverify "$DownloadFile" -shadow ) # Mount the DMG
+MountedPath=$( /bin/echo "$MountOutput" | grep Volumes | awk '{print $3,$4,$5,$6,$7,$8,$9}' ) # Grab the path the DMG was mounted at
+shopt -s extglob # Enable bash "Path Name Expansion"
+MountVolume="${MountedPath%%*( )}" # Check the Mounted Volume
+shopt -u extglob # Disable bash "Path Name Expansion"
+MountedDevice=$( /bin/echo "$MountOutput" | grep disk | head -1 | awk '{print $1}' ) # Find the Devie ID assigned to the mounted Volume
+#
+if [ $? == 0 ] # Test the Mount was Successful
+	then
+		/bin/echo 'DMG mounted successfully as volume "'$MountVolume'" on device "'$MountedDevice'"'
+		/bin/echo # Outputting a Blank Line for Reporting Purposes
+		/bin/echo 'Copying Mounted files from "'$MountVolume'" to "/tmp/'$DownloadFileName'/Mounted/"'
+		/bin/echo # Outputting a Blank Line for Reporting Purposes
+		/bin/echo 'Running Command "cp -r "'${MountVolume}'/" /tmp/"'${DownloadFileName}'/Mounted/"'
+		cp -R "${MountVolume}" /tmp/"${DownloadFileName}"/Mounted/ # Copy files to temporary working folder
+		#
+		SectionEnd
+		UnMount
+		SectionEnd
+		# Set flag to indicate $DownloadFileName value will be changed, and preserve original value
+		PreMountedFileName=$DownloadFileName
+		DownloadFileName=$( echo ${DownloadFileName}/Mounted ) # Re-set $DownloadFileName to copied filed
+		/bin/echo 'Checking copied files for installers'
+        /bin/echo # Outputting a Blank Line for Reporting Purposes
+		if [[ $( ls /tmp/$DownloadFileName | grep ".app" ) != "" ]]
+			then
+				/bin/echo '.app found'
+				DownloadExt="app"
+		fi
+		#
+		if [[ $( ls /tmp/$DownloadFileName | grep ".pkg" ) != "" ]]
+			then
+				/bin/echo '.pkg found'
+				DownloadExt="pkg"
+		fi
+	else
+		/bin/echo "There was an error mounting the DMG. Exit Code: $?"
+fi
+#
+}
+#
+###############################################################################################################################################
+#
 # Installer App Function
 #
 InstallerApp(){
 #
-InstallerApp=$(ls "/tmp/$DownloadFileName" | grep ".app") # Search for the Installer .app
-chmod a+x "/tmp/$DownloadFileName/$InstallerApp/Contents/MacOS" # correcting permissions inside the installer
-/bin/echo 'Installing "'$InstallerApp'"'
-/bin/echo # Outputting a Blank Line for Reporting Purposes
-/bin/echo 'Running Command "'sudo /tmp/$DownloadFileName/$InstallerApp/$AppInstallerCommand $AppInstallerSwitches'"'
-/bin/echo # Outputting a Blank Line for Reporting Purposes
-sudo "/tmp/$DownloadFileName/$InstallerApp/$AppInstallerCommand" $AppInstallerSwitches # Install App
+if [[ $AppInstallerCommand == "" ]] # Check if link is a "HotLink"
+	then
+		InstallerApp=$(ls "/tmp/$DownloadFileName" | grep ".app") # Search for the Installer .app
+		/bin/echo 'Installing "'$InstallerApp'"'
+		/bin/echo # Outputting a Blank Line for Reporting Purposes
+		/bin/echo 'Running Command "'cp -R "/tmp/'$DownloadFileName/${InstallerApp}'" /Applications/'"'
+		cp -R "/tmp/$DownloadFileName/${InstallerApp}" /Applications/
+	else
+		/bin/echo 'Installer command "'$AppInstallerCommand'" has been Requested'
+        if [[ $$AppInstallerSwitches == "" ]] # Check if link is a "HotLink"
+			then
+				/bin/echo 'AND Installer switches "'$AppInstallerSwitches'" have been Requested'
+		fi
+		#
+		chmod a+x "/tmp/$DownloadFileName/$InstallerApp/Contents/MacOS" # correcting permissions inside the installer
+		/bin/echo 'Installing "'$InstallerApp'"'
+		/bin/echo # Outputting a Blank Line for Reporting Purposes
+		/bin/echo 'Running Command "'sudo /tmp/$DownloadFileName/${InstallerApp}$AppInstallerCommand $AppInstallerSwitches'"'
+		/bin/echo # Outputting a Blank Line for Reporting Purposes
+		sudo "/tmp/$DownloadFileName/${InstallerApp}$AppInstallerCommand $AppInstallerSwitches" # Install App
+fi
 #
 }
 #
@@ -212,6 +284,25 @@ if [[ "$AppOutput" == *"No such file"* ]] # Error Check incase installer App is 
                     	/bin/echo 'OK'
 				fi
 			done  
+fi
+#
+}
+#
+###############################################################################################################################################
+#
+# UnMount Image Function
+#
+UnMount(){
+#
+/bin/echo 'UnMounting volume "'$MountVolume'" from device "'$MountedDevice'"'
+/bin/echo # Outputting a Blank Line for Reporting Purposes
+/bin/echo 'Running Command "'umount $MountVolume'"'
+UnMountResult=$( umount $MountVolume )
+#
+if [[ $UnMountResult == "" ]] # check if $DownloadFileNamethere needs resetting for cleanup
+	then
+		/bin/echo 'UnMount of "'$MountVolume'" from "'$MountedDevice'" Confirmed Succesful' 
+        
 fi
 #
 }
@@ -273,6 +364,12 @@ SectionEnd
 Download
 SectionEnd
 #
+if [ $DownloadExt == "dmg" ] # check if the installer needs unzipping
+	then
+		ImageMount
+        SectionEnd
+fi
+#
 if [ $DownloadExt == "zip" ] # check if the installer needs unzipping
 	then
 		UnZip
@@ -281,10 +378,27 @@ if [ $DownloadExt == "zip" ] # check if the installer needs unzipping
 		SectionEnd
 fi
 #
+if [ $DownloadExt == "app" ] # check if the installer needs unzipping
+	then
+		InstallerApp
+		SectionEnd
+fi
+#
 if [ $DownloadExt == "pkg" ] # check if the installer needs unzipping
 	then
 		pkgInstall
 		SectionEnd
+fi
+#
+#if [[ $MountVolume != "" ]] # check if there is a DMG to Unmount
+#	then
+#		UnMount
+#		SectionEnd
+#fi
+#
+if [[ $PreMountedFileName != "" ]] # check if $DownloadFileNamethere needs resetting for cleanup
+	then
+		DownloadFileName=$PreMountedFileName
 fi
 #
 Cleanup
