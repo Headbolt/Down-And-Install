@@ -11,14 +11,14 @@
 #
 #	The Following Variables should be defined
 #	Variable 4 - Named "Download URL for Client Connector - eg. https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/SophosInstall.zip"
-#	Variable 5 - Named "Install Command - eg. Sophos Installer - OPTIONAL"
+#	Variable 5 - Named "Install Command - eg. /Contents/MacOS/Sophos Installer - OPTIONAL"
 #	Variable 6 - Named "Installer Switches - eg. --quiet - OPTIONAL"
 #
 ###############################################################################################################################################
 #
 # HISTORY
 #
-#   Version: 1.3 - 22/11/2022
+#   Version: 1.4 - 23/11/2022
 #
 #	05/10/2022 - V1.0 - Created by Headbolt
 #
@@ -31,6 +31,9 @@
 #	22/11/2022 - V1.3 - Updated by Headbolt
 #							Legislating for DMG downloads, and direct .app's as well as .app's 
 #							That are Installers
+#
+#	23/11/2022 - V1.4 - Updated by Headbolt
+#							Legislating for ZIP downloads, and common syntax based install failures for .app's
 #
 ###############################################################################################################################################
 #
@@ -150,6 +153,14 @@ UnZip(){
 /bin/echo 'Running Command "'unzip $DownloadFile'"'
 /bin/echo # Outputting a Blank Line for Reporting Purposes
 unzip $DownloadFile
+/bin/echo # Outputting a Blank Line for Reporting Purposes
+/bin/echo 'Cleaning up original zip "/tmp/'${DownloadFileName}/$DownloadFile'"'
+/bin/echo # Outputting a Blank Line for Reporting Purposes
+/bin/echo 'Running Command "rm -rf /tmp/'${DownloadFileName}/$DownloadFile'"'
+sudo rm -rf /tmp/${DownloadFileName}/$DownloadFile
+#
+SectionEnd
+PostExpansionIInstallerSearch
 #
 }
 #
@@ -186,6 +197,18 @@ if [ $? == 0 ] # Test the Mount was Successful
 		# Set flag to indicate $DownloadFileName value will be changed, and preserve original value
 		PreMountedFileName=$DownloadFileName
 		DownloadFileName=$( echo ${DownloadFileName}/Mounted ) # Re-set $DownloadFileName to copied filed
+		PostExpansionIInstallerSearch
+	else
+		/bin/echo "There was an error mounting the DMG. Exit Code: $?"
+fi
+#
+}
+################################################################################################################################################
+#
+# Post Expansion Installer Search Function
+#
+PostExpansionIInstallerSearch(){
+#
 		/bin/echo 'Checking copied files for installers'
         /bin/echo # Outputting a Blank Line for Reporting Purposes
 		if [[ $( ls /tmp/$DownloadFileName | grep ".app" ) != "" ]]
@@ -199,9 +222,6 @@ if [ $? == 0 ] # Test the Mount was Successful
 				/bin/echo '.pkg found'
 				DownloadExt="pkg"
 		fi
-	else
-		/bin/echo "There was an error mounting the DMG. Exit Code: $?"
-fi
 #
 }
 #
@@ -211,26 +231,49 @@ fi
 #
 InstallerApp(){
 #
-if [[ $AppInstallerCommand == "" ]] # Check if link is a "HotLink"
+InstallerApp=$(ls "/tmp/$DownloadFileName" | grep ".app") # Search for the Installer .app
+/bin/echo 'Installing "'$InstallerApp'"'
+/bin/echo # Outputting a Blank Line for Reporting Purposes
+if [[ $AppInstallerCommand == "" ]] # Check if installer Commands are Requested
 	then
-		InstallerApp=$(ls "/tmp/$DownloadFileName" | grep ".app") # Search for the Installer .app
-		/bin/echo 'Installing "'$InstallerApp'"'
-		/bin/echo # Outputting a Blank Line for Reporting Purposes
 		/bin/echo 'Running Command "'cp -R "/tmp/'$DownloadFileName/${InstallerApp}'" /Applications/'"'
 		cp -R "/tmp/$DownloadFileName/${InstallerApp}" /Applications/
 	else
 		/bin/echo 'Installer command "'$AppInstallerCommand'" has been Requested'
-        if [[ $$AppInstallerSwitches == "" ]] # Check if link is a "HotLink"
+        if [[ $AppInstallerSwitches != "" ]] # Check if installer Switches are Requested
 			then
 				/bin/echo 'AND Installer switches "'$AppInstallerSwitches'" have been Requested'
 		fi
 		#
 		chmod a+x "/tmp/$DownloadFileName/$InstallerApp/Contents/MacOS" # correcting permissions inside the installer
-		/bin/echo 'Installing "'$InstallerApp'"'
 		/bin/echo # Outputting a Blank Line for Reporting Purposes
-		/bin/echo 'Running Command "'sudo /tmp/$DownloadFileName/${InstallerApp}$AppInstallerCommand $AppInstallerSwitches'"'
-		/bin/echo # Outputting a Blank Line for Reporting Purposes
-		sudo "/tmp/$DownloadFileName/${InstallerApp}$AppInstallerCommand $AppInstallerSwitches" # Install App
+		/bin/echo 'Running Command "sudo "/tmp/'$DownloadFileName/${InstallerApp}$AppInstallerCommand $AppInstallerSwitches'"'
+		Install=$( sudo "/tmp/$DownloadFileName/$InstallerApp""$AppInstallerCommand" "$AppInstallerSwitches" 2>&1 ) # Install App
+		#
+		AlternateInstallMethod="" # Ensure The AlternateInstallMethod Variable is Blank at the outset
+		#
+		if [[ "$Install" == *"Error: There has been an error"* ]] # Check for common failure due to formatting
+			then
+				/bin/echo # Outputting a Blank Line for Reporting Purposes
+				/bin/echo 'An "Error: There has been an error" error was returned, assuming the app installer dislikes the syntax.'
+				AlternateInstallMethod="YES"
+		fi
+		if [[ "$Install" == *"command not found"* ]] # Check for common failure due to formatting
+			then
+				/bin/echo # Outputting a Blank Line for Reporting Purposes
+				/bin/echo 'A "command not found" error was returned, assuming the app installer dislikes the syntax.'
+				AlternateInstallMethod="YES"
+		fi
+		#
+		if [[ $AlternateInstallMethod == "YES" ]] # Check if alternate install method is needed
+			then
+				/bin/echo # Outputting a Blank Line for Reporting Purposes
+				/bin/echo 'Attempting a different method of running the same command'
+				# To get around occasional tricky syntax with certain installers, pull install command into Variable
+				InstallCommand=$( /bin/echo "sudo /tmp/$DownloadFileName/${InstallerApp}${AppInstallerCommand} ${AppInstallerSwitches}" )
+				/bin/echo # Outputting a Blank Line for Reporting Purposes
+				$InstallCommand # Run Install
+		fi
 fi
 #
 }
@@ -314,6 +357,7 @@ fi
 Cleanup(){
 #
 /bin/echo 'Cleaning up Temporary Working Folder "/tmp/'$DownloadFileName'"'
+/bin/echo 'sudo rm -rf "/tmp/'$DownloadFileName'"'
 sudo rm -rf "/tmp/$DownloadFileName"
 #
 }
@@ -374,8 +418,6 @@ if [ $DownloadExt == "zip" ] # check if the installer needs unzipping
 	then
 		UnZip
         SectionEnd
-		InstallerApp
-		SectionEnd
 fi
 #
 if [ $DownloadExt == "app" ] # check if the installer needs unzipping
@@ -389,12 +431,6 @@ if [ $DownloadExt == "pkg" ] # check if the installer needs unzipping
 		pkgInstall
 		SectionEnd
 fi
-#
-#if [[ $MountVolume != "" ]] # check if there is a DMG to Unmount
-#	then
-#		UnMount
-#		SectionEnd
-#fi
 #
 if [[ $PreMountedFileName != "" ]] # check if $DownloadFileNamethere needs resetting for cleanup
 	then
