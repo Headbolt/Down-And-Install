@@ -18,7 +18,7 @@
 #
 # HISTORY
 #
-#   Version: 1.4 - 23/11/2022
+#   Version: 1.5 - 22/12/2022
 #
 #	05/10/2022 - V1.0 - Created by Headbolt
 #
@@ -34,6 +34,11 @@
 #
 #	23/11/2022 - V1.4 - Updated by Headbolt
 #							Legislating for ZIP downloads, and common syntax based install failures for .app's
+#
+#	22/12/2022 - V1.5 - Updated by Headbolt
+#							Legislating for the tmp folder not being present.
+#							Instances observed where the /tmp link exists, but the default folder it points to ( /private/tmp )
+#							is missing for some reason. Logic check put in to recreate when needed.
 #
 ###############################################################################################################################################
 #
@@ -125,7 +130,15 @@ if [ $Hotlink == "YES" ] # If link is a "HotLink" process accordingly to pull ou
 		EvaluateDownload
         SectionEnd
         /bin/echo 'NOW Downloading the Installer'
-		/bin/echo # Outputting a Blank Line for Reporting Purposes
+fi
+#
+/bin/echo 'Creating Temporary Working Folder "/tmp/'$DownloadFileName'"'
+if [ -d "/tmp" ]
+	then
+    	/bin/echo # Outputting a Blank Line for Reporting Purposes
+	else
+    	/bin/echo # Outputting a Blank Line for Reporting Purposes
+        mkdir "/private/tmp"
 fi
 #
 /bin/echo 'Creating Temporary Working Folder "/tmp/'$DownloadFileName'"'
