@@ -18,7 +18,7 @@
 #
 # HISTORY
 #
-#   Version: 1.5 - 22/12/2022
+#   Version: 1.6 - 22/05/2023
 #
 #	05/10/2022 - V1.0 - Created by Headbolt
 #
@@ -39,6 +39,10 @@
 #							Legislating for the tmp folder not being present.
 #							Instances observed where the /tmp link exists, but the default folder it points to ( /private/tmp )
 #							is missing for some reason. Logic check put in to recreate when needed.
+#
+#	22/05/2023 - V1.6 - Updated by Headbolt
+#							Legislating for variance in output returned by the "curl -m 5 -si" command
+#							and upating some minor logic to take this into account
 #
 ###############################################################################################################################################
 #
@@ -117,12 +121,16 @@ if [ $Hotlink == "YES" ] # If link is a "HotLink" process accordingly to pull ou
 		/bin/echo "Download URL is a Hotlink, following Link to find proper download URL and FileName"
         # Check Hotlink and find the actual Download we need, also legislate for occasional carriage reurn at end
 		HotlinkResolvedURL=$(curl -m 5 -si $DownloadURL | awk '($1 == "Location:") { print $NF; exit }' | sed $'s/\r$//')
+		if [[ "$HotlinkResolvedURL" = "" ]] # If the "HotLink URL" is blank, attepmt again with a lowercase "location" as some can resolve this way
+			then
+				HotlinkResolvedURL=$(curl -m 5 -si $DownloadURL | awk '($1 == "location:") { print $NF; exit }' | sed $'s/\r$//')
+		fi
         /bin/echo # Outputting a Blank Line for Reporting Purposes
         /bin/echo "Changing Download URL"
         /bin/echo "From..."
-        /bin/echo $DownloadURL
+        /bin/echo '"'$DownloadURL'"'
         /bin/echo "To..."
-        /bin/echo $HotlinkResolvedURL
+        /bin/echo '"'$HotlinkResolvedURL'"'
         DownloadURL="$HotlinkResolvedURL"
 		/bin/echo # Outputting a Blank Line for Reporting Purposes
         /bin/echo "Sending new URL for Re-Evaluation"
