@@ -43,6 +43,7 @@
 #	22/05/2023 - V1.6 - Updated by Headbolt
 #							Legislating for variance in output returned by the "curl -m 5 -si" command
 #							and upating some minor logic to take this into account
+#							Also checking for Hotlinks that resolve slightly differently.
 #
 ###############################################################################################################################################
 #
@@ -373,6 +374,40 @@ fi
 #
 ###############################################################################################################################################
 #
+# Install Function
+#
+Install(){
+#
+if [ $DownloadExt == "dmg" ] # check if the installer needs unzipping
+	then
+		ImageMount
+        SectionEnd
+fi
+#
+if [ $DownloadExt == "zip" ] # check if the installer needs unzipping
+	then
+		UnZip
+        SectionEnd
+fi
+#
+if [ $DownloadExt == "app" ] # check if the installer needs unzipping
+	then
+		InstallerApp
+		AppInstallerActioned="YES"
+		SectionEnd
+fi
+#
+if [ $DownloadExt == "pkg" ] # check if the installer needs unzipping
+	then
+		pkgInstall
+		AppInstallerActioned="YES"
+		SectionEnd
+fi
+#
+}
+#
+###############################################################################################################################################
+#
 # Cleanup Function
 #
 Cleanup(){
@@ -429,28 +464,22 @@ SectionEnd
 Download
 SectionEnd
 #
-if [ $DownloadExt == "dmg" ] # check if the installer needs unzipping
-	then
-		ImageMount
-        SectionEnd
-fi
+AppInstallerActioned="NO" # Set variable to No, so we know if an Install has been attempted
+Install
 #
-if [ $DownloadExt == "zip" ] # check if the installer needs unzipping
+if [[ "$AppInstallerActioned" == "NO" ]] # If no Install has been attempted, then further checks needed
 	then
-		UnZip
-        SectionEnd
-fi
-#
-if [ $DownloadExt == "app" ] # check if the installer needs unzipping
-	then
-		InstallerApp
-		SectionEnd
-fi
-#
-if [ $DownloadExt == "pkg" ] # check if the installer needs unzipping
-	then
-		pkgInstall
-		SectionEnd
+		if [[ $DownloadExt != "" ]] # Check if a download Extentsion has been found, if so it may be that there is extra data in it
+			then
+				FileSearch=$(find "/tmp/$DownloadFileName" -name *.zip) # Search the Temp folder for a .ZIP
+				if [[ "$FileSearch" == "" ]] # If the search of the Temp folder for a .ZIP returns nothing ....
+					then
+						FileSearch=$(find "/tmp/$DownloadFileName" -name *.dmg) # Search the Temp folder for a .DMG
+				fi
+				DownloadURL=$FileSearch # Set the search result to the Download URL
+				EvaluateDownload # Re-evaluate
+				Install # Attempt Install
+		fi
 fi
 #
 if [[ $PreMountedFileName != "" ]] # check if $DownloadFileNamethere needs resetting for cleanup
