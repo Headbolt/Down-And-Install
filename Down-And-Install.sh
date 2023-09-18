@@ -18,7 +18,7 @@
 #
 # HISTORY
 #
-#   Version: 1.6 - 22/05/2023
+#   Version: 1.7 - 18/09/2023
 #
 #	05/10/2022 - V1.0 - Created by Headbolt
 #
@@ -44,6 +44,10 @@
 #							Legislating for variance in output returned by the "curl -m 5 -si" command
 #							and upating some minor logic to take this into account
 #							Also checking for Hotlinks that resolve slightly differently.
+#
+#	18/09/2023 - V1.7 - Updated by Headbolt
+#							Updated some Syntax to fix errors
+#							Also added section to deal with certain kinds of download results
 #
 ###############################################################################################################################################
 #
@@ -378,30 +382,62 @@ fi
 #
 Install(){
 #
-if [ $DownloadExt == "dmg" ] # check if the installer needs unzipping
+if [ "$DownloadExt" == "dmg" ] # check if the installer needs unzipping
 	then
 		ImageMount
         SectionEnd
 fi
 #
-if [ $DownloadExt == "zip" ] # check if the installer needs unzipping
+if [ "$DownloadExt" == "zip" ] # check if the installer needs unzipping
 	then
 		UnZip
         SectionEnd
 fi
 #
-if [ $DownloadExt == "app" ] # check if the installer needs unzipping
+if [ "$DownloadExt" == "app" ] # check if the installer needs unzipping
 	then
 		InstallerApp
 		AppInstallerActioned="YES"
 		SectionEnd
 fi
 #
-if [ $DownloadExt == "pkg" ] # check if the installer needs unzipping
+if [ "$DownloadExt" == "pkg" ] # check if the installer needs unzipping
 	then
 		pkgInstall
 		AppInstallerActioned="YES"
 		SectionEnd
+fi
+#
+}
+#
+###############################################################################################################################################
+#
+# App Search Function
+#
+AppSearch(){
+#
+FileSearch=$(find "/tmp/$DownloadFileName" -name *.dmg) # Search the Temp folder for a .ZIP
+if [[ "$FileSearch" != "" ]] # If the search of the Temp folder for a .DMG returns something ....
+	then
+		DownloadURL=$FileSearch
+fi
+#
+FileSearch=$(find "/tmp/$DownloadFileName" -name *.zip) # Search the Temp folder for a .ZIP
+if [[ "$FileSearch" != "" ]] # If the search of the Temp folder for a .ZIP returns something ....
+	then
+		DownloadURL=$FileSearch
+fi
+#
+FileSearch=$(find "/tmp/$DownloadFileName" -name *.pkg) # Search the Temp folder for a .ZIP
+if [[ "$FileSearch" != "" ]] # If the search of the Temp folder for a .PKG returns something ....
+	then
+		DownloadURL=$FileSearch
+fi
+#
+FileSearch=$(find "/tmp/$DownloadFileName" -name *.app) # Search the Temp folder for a .ZIP
+if [[ "$FileSearch" != "" ]] # If the search of the Temp folder for a .APP returns something ....
+	then
+		DownloadURL=$FileSearch
 fi
 #
 }
@@ -469,17 +505,9 @@ Install
 #
 if [[ "$AppInstallerActioned" == "NO" ]] # If no Install has been attempted, then further checks needed
 	then
-		if [[ $DownloadExt != "" ]] # Check if a download Extentsion has been found, if so it may be that there is extra data in it
-			then
-				FileSearch=$(find "/tmp/$DownloadFileName" -name *.zip) # Search the Temp folder for a .ZIP
-				if [[ "$FileSearch" == "" ]] # If the search of the Temp folder for a .ZIP returns nothing ....
-					then
-						FileSearch=$(find "/tmp/$DownloadFileName" -name *.dmg) # Search the Temp folder for a .DMG
-				fi
-				DownloadURL=$FileSearch # Set the search result to the Download URL
-				EvaluateDownload # Re-evaluate
-				Install # Attempt Install
-		fi
+		AppSearch
+			EvaluateDownload # Re-evaluate
+			Install # Attempt Install
 fi
 #
 if [[ $PreMountedFileName != "" ]] # check if $DownloadFileNamethere needs resetting for cleanup
