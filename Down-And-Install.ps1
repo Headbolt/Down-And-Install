@@ -187,8 +187,7 @@ If ( $global:Action -eq "install" )
 	Write-Host '"Install" action requested'
 	Write-Host ''# Outputting a Blank Line for Reporting Purposes
 	Write-Host 'Running Command "MsiExec.exe /i '$global:LocalFilePath /qn'"'
-	Write-Host ''# Outputting a Blank Line for Reporting Purposes
-	MsiExec.exe /i $global:LocalFilePath /qn
+	Start-Process msiexec "/i $global:LocalFilePath /qn" -wait
 	SectionEnd
 }
 #
@@ -197,8 +196,7 @@ If ( $global:Action -eq "uninstall" )
 	Write-Host '"Un-Install" action requested'
 	Write-Host ''# Outputting a Blank Line for Reporting Purposes
 	Write-Host 'Running Command "MsiExec.exe /x '$global:LocalFilePath /qn'"'
-	Write-Host ''# Outputting a Blank Line for Reporting Purposes
-	MsiExec.exe /x $global:LocalFilePath /qn
+	Start-Process msiexec "/x $global:LocalFilePath /qn" -wait
 	SectionEnd
 }
 #
