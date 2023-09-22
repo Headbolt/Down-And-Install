@@ -9,6 +9,12 @@
 #   This Script is designed for use in Intunewin packages and was designed to Download
 #	an MSI installer and install, or uninstall it
 #
+# 		Note as IntuneWin are 32 Bit Apps, powershell in the App Command will need to be forced to Native
+#			Otherwise Reg Searches for Uninstall commands in HKLM:\SOFTWARE\Microsoft
+#			may get redirected to HKLM:\SOFTWARE\Wow6432Node\Microsoft, resulting in uninstallers not being found
+#			so call powershell like this
+#			%windir%\SysNative\WindowsPowershell\v1.0\PowerShell.exe -executionpolicy bypass -command ./Down-And-Install.ps1
+#
 ###############################################################################################################################################
 #
 #	Usage
@@ -22,13 +28,16 @@
 #
 # HISTORY
 #
-#   Version: 1.1 - 22/09/2023
+#   Version: 1.2 - 22/09/2023
 #
 #	19/09/2023 - V1.0 - Created by Headbolt
 #
 #	22/09/2023 - V1.1 - Updated by Headbolt
 #				Found a few instances where syntax of potential URL would not work
 #				Re-Wrote to compensate and also improve notation, error checking
+#
+#	22/09/2023 - V1.2 - Updated by Headbolt
+#				Minor Syntax error when used in very specific cases
 #
 ###############################################################################################################################################
 #
@@ -45,6 +54,7 @@ param (
 )
 #
 $LocalLogFilePath="$Env:WinDir\temp\" # Set LogFile Patch
+$global:ScriptVer="1.2" # Set ScriptVersion for logging
 $global:ScriptName="Application | Download and Install" # Set ScriptName for logging
 #
 $global:URL=$URL # Pull URL into a Global Variable
@@ -81,6 +91,8 @@ Start-Transcript $global:LocalLogFilePath # Start the logging
 Clear-Host # Clear Screen
 SectionEnd
 Write-Host "Logging to $global:LocalLogFilePath"
+Write-Host ''# Outputting a Blank Line for Reporting Purposes
+Write-Host "Script Version $global:ScriptVer"
 }     
 #
 ###############################################################################################################################################
@@ -173,10 +185,10 @@ Write-Host $global:URL
 function RegScan
 {
 #
-Write-Host "Searching for Uninstall String"
+Write-Host "Searching for Uninstall String for $Global:AppName"
 Write-Host '' # Outputting a Blank Line for Reporting Purposes
 #
-$Global:UninstallString=(Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' | % { Get-ItemProperty $_.PsPath } | ? { $_.DisplayName -eq $AppName } | % { Write-Output $_.UninstallString } )
+$Global:UninstallString=(Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' | Foreach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.DisplayName -eq "$Global:AppName" } | Foreach-Object { Write-Output $_.UninstallString } )
 #
 if ($Global:UninstallString)
 { 
@@ -188,7 +200,7 @@ else
 	Write-Host 'Nothing found in "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"'
 	Write-Host '' # Outputting a Blank Line for Reporting Purposes
 	Write-Host 'Checking "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"'
-	$Global:UninstallString=(Get-ChildItem 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall' | % { Get-ItemProperty $_.PsPath } | ? { $_.DisplayName -eq $AppName } | % { Write-Output $_.UninstallString } )
+	$Global:UninstallString=(Get-ChildItem 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall' | Foreach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.DisplayName -eq "$Global:AppName" } | Foreach-Object { Write-Output $_.UninstallString } )
 	if ($Global:UninstallString)
 	{
 		Write-Host '' # Outputting a Blank Line for Reporting Purposes
@@ -196,7 +208,8 @@ else
 		Write-Host 'in "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"'
 	}
 	else
-	{ 
+	{
+		Write-Host '' # Outputting a Blank Line for Reporting Purposes
 		Write-Host "No Uninstall String Found"
 	}
 }
@@ -289,7 +302,7 @@ If ( $Uninstall )
 {
 	Write-Host '"Un-Install" action requested'
 	SectionEnd
-	If ( $AppName ) # Check App Name  is set
+	If ($Global:AppName ) # Check App Name  is set
 	{
 		RegScan
 		SectionEnd
@@ -300,7 +313,6 @@ If ( $Uninstall )
 		else
 		{
 		Write-Host 'Cannot continue without Uninstall String'
-		SectionEnd
 		}
 	}
 	else
