@@ -104,6 +104,7 @@ if (Test-Path -Path $global:LocalFilePath)
 		ExpandURL
 		SectionEnd
 		Download
+  		SectionEnd
 	}
 }
 Else
@@ -112,6 +113,7 @@ Else
 	ExpandURL
 	SectionEnd
 	Download
+ 	SectionEnd
 }
 #
 }
