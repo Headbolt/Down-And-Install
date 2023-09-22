@@ -12,16 +12,23 @@
 ###############################################################################################################################################
 #
 #	Usage
-#		Down-And-Install.ps1 [install|uninstall] <LocalFile> <downloadurl>
-#		eg. Down-And-Install.ps1 install Zoom.msi https://zoom.com/installer.msi
+#		Down-And-Install.ps1 [-install | -uninstall] -MSIName <msi name> -URL <download url> -appname <app name>
+#		eg. Down-And-Install.ps1 -install -MSIName Zoom.msi -URL 'https://zoom.com/installer.msi?c="&"c='
+#			note special characters in the url will need double quoting with the entire url single quoted
+#
+#		eg. Down-And-Install.ps1 -uninstall -appname 'Zoom'
 #
 ###############################################################################################################################################
 #
 # HISTORY
 #
-#   Version: 1.0 - 19/09/2023
+#   Version: 1.1 - 22/09/2023
 #
 #	19/09/2023 - V1.0 - Created by Headbolt
+#
+#	22/09/2023 - V1.1 - Updated by Headbolt
+#				Found a few instances where syntax of potential URL would not work
+#				Re-Wrote to compensate and also improve notation, error checking
 #
 ###############################################################################################################################################
 #
@@ -29,14 +36,36 @@
 #
 ###############################################################################################################################################
 #
-$global:Action=$args[0] # Grab the Action Decision from variable #0 eg Install
-$global:LocalFile=$args[1] # Grab the Local Filename to use from variable #1 eg Install
-$global:URL=$args[2] # Grab the Download URL for the installer variable #2 eg. https://dl.ms.com/file.msi
+param (
+	[switch]$Install,
+	[switch]$Uninstall,
+ 	[string]$MSIName,
+ 	[string]$URL,
+	[string]$AppName
+)
 #
-$global:LocalFilePath="$Env:WinDir\temp\$global:LocalFile" # Construct Local File Path
-$global:LocalLogFilePath="$global:LocalFilePath-$global:Action.log" # Construct Log File Path
+$LocalLogFilePath="$Env:WinDir\temp\" # Set LogFile Patch
+$global:ScriptName="Application | Download and Install" # Set ScriptName for logging
 #
-$global:ScriptName="Application | Download and Install"
+$global:URL=$URL # Pull URL into a Global Variable
+$global:AppName=$AppName # Pull Appname into a Global Variable 
+$global:LocalFilePath="$Env:WinDir\temp\$MSIName" # Construct Local File Path
+#
+If ( $Install )
+{
+#
+$LocalLogFileType="_Install.log" # Set ActionType for Log File Path
+$global:LocalLogFilePath=$LocalLogFilePath+$MSIName+$LocalLogFileType # Construct Log File Path
+#
+}
+#
+If ( $Uninstall )
+{
+#
+$LocalLogFileType="_Uninstall.log" # Set ActionType for Log File Path
+$global:LocalLogFilePath=$LocalLogFilePath+$AppName+$LocalLogFileType # Construct Log File Path
+#
+}
 #
 ###############################################################################################################
 #
@@ -49,7 +78,7 @@ $global:ScriptName="Application | Download and Install"
 function Logging
 {
 Start-Transcript $global:LocalLogFilePath # Start the logging
-Clear-Host #Clear Screen
+Clear-Host # Clear Screen
 SectionEnd
 Write-Host "Logging to $global:LocalLogFilePath"
 }     
@@ -135,6 +164,56 @@ Write-Host 'Expanded URL'
 Write-Host $global:URL
 #
 }
+################################################################################################################################################
+#
+# RegScan Function
+#
+function RegScan
+{
+#
+Write-Host "Searching for Uninstall String"
+Write-Host '' # Outputting a Blank Line for Reporting Purposes
+#
+$Global:UninstallString=(Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' | % { Get-ItemProperty $_.PsPath } | ? { $_.DisplayName -eq $AppName } | % { Write-Output $_.UninstallString } )
+#
+if ($Global:UninstallString)
+{ 
+	Write-Host "Found $UninstallString"
+	Write-Host 'in "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"'
+}
+else
+{ 
+	Write-Host 'Nothing found in "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"'
+	Write-Host '' # Outputting a Blank Line for Reporting Purposes
+	Write-Host 'Checking "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"'
+	$Global:UninstallString=(Get-ChildItem 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall' | % { Get-ItemProperty $_.PsPath } | ? { $_.DisplayName -eq $AppName } | % { Write-Output $_.UninstallString } )
+	if ($Global:UninstallString)
+	{
+		Write-Host '' # Outputting a Blank Line for Reporting Purposes
+		Write-Host "Found $UninstallString"
+		Write-Host 'in "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"'
+	}
+	else
+	{ 
+		Write-Host "No Uninstall String Found"
+	}
+}
+#
+}
+#
+###############################################################################################################################################
+#
+# Uninstall Function
+#
+function Uninstall
+{
+#
+[String]$UninstallCommand=(Write-Output $UninstallString.substring(12) /qn)
+#
+Write-Host 'Running Command "Start-Process msiexec.exe -Wait -ArgumentList'$UninstallCommand'"'
+Start-Process msiexec.exe -Wait -ArgumentList $UninstallCommand
+#
+}
 #
 ###############################################################################################################################################
 #
@@ -178,28 +257,55 @@ Stop-Transcript # Stop Logging
 Logging
 #
 SectionEnd
-DownloadCheck
 #
-SectionEnd
-#
-If ( $global:Action -eq "install" )
+If ( $Install )
 {
 	Write-Host '"Install" action requested'
-	Write-Host ''# Outputting a Blank Line for Reporting Purposes
-	Write-Host 'Running Command "MsiExec.exe /i '$global:LocalFilePath /qn'"'
-	Start-Process msiexec "/i $global:LocalFilePath /qn" -wait
 	SectionEnd
+	If ( $URL ) # Check URL is set
+	{
+		If ( $MSIName ) # Check MSI Name is set
+		{
+			DownloadCheck
+			Write-Host 'Running Command "MsiExec.exe /i '$global:LocalFilePath /qn'"'
+			Start-Process msiexec "/i $global:LocalFilePath /qn" -wait
+			SectionEnd
+			Cleanup
+		}
+		else
+		{
+			Write-Host 'MSIName not set, cannot continue'
+		}
+	}
+	else
+	{
+		Write-Host 'URL not set, cannot continue'
+	}	
 }
 #
-If ( $global:Action -eq "uninstall" )
+If ( $Uninstall )
 {
 	Write-Host '"Un-Install" action requested'
-	Write-Host ''# Outputting a Blank Line for Reporting Purposes
-	Write-Host 'Running Command "MsiExec.exe /x '$global:LocalFilePath /qn'"'
-	Start-Process msiexec "/x $global:LocalFilePath /qn" -wait
 	SectionEnd
+	If ( $AppName ) # Check App Name  is set
+	{
+		RegScan
+		SectionEnd
+		if ($Global:UninstallString)
+		{
+			Uninstall
+		}
+		else
+		{
+		Write-Host 'Cannot continue without Uninstall String'
+		SectionEnd
+		}
+	}
+	else
+	{
+		Write-Host 'App Name not set, cannot continue'
+	}	
 }
 #
-Cleanup
 SectionEnd
 ScriptEnd
