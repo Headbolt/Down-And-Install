@@ -18,8 +18,9 @@
 ###############################################################################################################################################
 #
 #	Usage
-#		Down-And-Install.ps1 [-install | -uninstall] -MSIName <msi name> -URL <download url> -appname <app name>
-#		eg. Down-And-Install.ps1 -install -MSIName Zoom.msi -URL 'https://zoom.com/installer.msi?c="&"c='
+#		Down-And-Install.ps1 [-install | -uninstall] -MSIName <msi name> -MSIinstallArgs <arguments> -URL <download url> -appname <app name>
+#			Note -MSIinstallArgs is optional
+#		eg. Down-And-Install.ps1 -install -MSIName Zoom.msi -MSIinstallArgs 'ACTID={aa}' -URL 'https://zoom.com/installer.msi?c="&"c='
 #			note special characters in the url will need double quoting with the entire url single quoted
 #
 #		eg. Down-And-Install.ps1 -uninstall -appname 'Zoom'
@@ -28,7 +29,7 @@
 #
 # HISTORY
 #
-#   Version: 1.2 - 22/09/2023
+#   Version: 1.3 - 04/10/2023
 #
 #	19/09/2023 - V1.0 - Created by Headbolt
 #
@@ -38,6 +39,9 @@
 #
 #	22/09/2023 - V1.2 - Updated by Headbolt
 #				Minor Syntax error when used in very specific cases
+#
+#	04/10/2023 - V1.3 - Updated by Headbolt
+#				Added option for additional Arguments to pass to install command
 #
 ###############################################################################################################################################
 #
@@ -49,16 +53,22 @@ param (
 	[switch]$Install,
 	[switch]$Uninstall,
  	[string]$MSIName,
+ 	[string]$MSIinstallArgs,
  	[string]$URL,
 	[string]$AppName
 )
 #
 $LocalLogFilePath="$Env:WinDir\temp\" # Set LogFile Patch
-$global:ScriptVer="1.2" # Set ScriptVersion for logging
+$global:ScriptVer="1.3" # Set ScriptVersion for logging
 $global:ScriptName="Application | Download and Install" # Set ScriptName for logging
 #
 $global:URL=$URL # Pull URL into a Global Variable
 $global:AppName=$AppName # Pull Appname into a Global Variable 
+If ( $MSIinstallArgs )
+{
+	$global:MSIinstallArgs=" $MSIinstallArgs" # Pull Install Arguments into a Global Variable, adding a leading space
+}
+#
 $global:LocalFilePath="$Env:WinDir\temp\$MSIName" # Construct Local File Path
 #
 If ( $Install )
@@ -282,8 +292,8 @@ If ( $Install )
 		If ( $MSIName ) # Check MSI Name is set
 		{
 			DownloadCheck
-			Write-Host 'Running Command "MsiExec.exe /i '$global:LocalFilePath /qn'"'
-			Start-Process msiexec "/i $global:LocalFilePath /qn" -wait
+			Write-Host 'Running Command "MsiExec.exe /i '$global:LocalFilePath$global:MSIinstallArgs /qn'"'
+			Start-Process msiexec "/i $global:LocalFilePath$global:MSIinstallArgs /qn" -wait
 			SectionEnd
 			Cleanup
 		}
