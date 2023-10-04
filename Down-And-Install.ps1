@@ -18,10 +18,11 @@
 ###############################################################################################################################################
 #
 #	Usage
-#		Down-And-Install.ps1 [-install | -uninstall] -MSIName <msi name> -MSIinstallArgs <arguments> -URL <download url> -appname <app name>
-#			Note -MSIinstallArgs is optional
-#		eg. Down-And-Install.ps1 -install -MSIName Zoom.msi -MSIinstallArgs 'ACTID={aa}' -URL 'https://zoom.com/installer.msi?c="&"c='
-#			note special characters in the url will need double quoting with the entire url single quoted
+#		Down-And-Install.ps1 [-install | -uninstall] -MSIName <msi name> -ExeName <exe name> -Args <arguments> -URL <download url> -appname <app name>
+#			Note -InstallArgs is optional
+#		eg. Down-And-Install.ps1 -install -MSIName Zoom.msi -Args 'ACTID={aa}' -URL 'https://zoom.com/installer.msi?c="&"c='
+#		eg. Down-And-Install.ps1 -install -ExeName Zoom.exe -Args 'ACTID={aa}' -URL 'https://zoom.com/installer.msi?c="&"c='
+#				note special characters in the url will need double quoting with the entire url single quoted
 #
 #		eg. Down-And-Install.ps1 -uninstall -appname 'Zoom'
 #
@@ -29,7 +30,7 @@
 #
 # HISTORY
 #
-#   Version: 1.3 - 04/10/2023
+#   Version: 1.4 - 04/10/2023
 #
 #	19/09/2023 - V1.0 - Created by Headbolt
 #
@@ -43,6 +44,9 @@
 #	04/10/2023 - V1.3 - Updated by Headbolt
 #				Added option for additional Arguments to pass to install command
 #
+#	04/10/2023 - V1.4 - Updated by Headbolt
+#				Added option for .EXE installers and Uninstallers
+#
 ###############################################################################################################################################
 #
 #   DEFINE VARIABLES & READ IN PARAMETERS
@@ -53,37 +57,41 @@ param (
 	[switch]$Install,
 	[switch]$Uninstall,
  	[string]$MSIName,
- 	[string]$MSIinstallArgs,
+ 	[string]$ExeName,
+ 	[string]$Args,
  	[string]$URL,
 	[string]$AppName
 )
 #
-$LocalLogFilePath="$Env:WinDir\temp\" # Set LogFile Patch
-$global:ScriptVer="1.3" # Set ScriptVersion for logging
-$global:ScriptName="Application | Download and Install" # Set ScriptName for logging
+$global:ScriptVer="1.4" # Set ScriptVersion for logging
 #
+$LocalLogFilePath="$Env:WinDir\temp\" # Set LogFile Patch
+$global:ScriptName="Application | Download and Install" # Set ScriptName for logging
 $global:URL=$URL # Pull URL into a Global Variable
+$global:MSIName=$MSIName # Pull MSIName into a Global Variable
+$global:ExeName=$ExeName # Pull ExeName into a Global Variable 
 $global:AppName=$AppName # Pull Appname into a Global Variable 
-If ( $MSIinstallArgs )
+#
+If ( $Args )
 {
-	$global:MSIinstallArgs=" $MSIinstallArgs" # Pull Install Arguments into a Global Variable, adding a leading space
+	$global:Args=" $Args" # Pull Arguments into a Global Variable, adding a leading space
 }
 #
 $global:LocalFilePath="$Env:WinDir\temp\$MSIName" # Construct Local File Path
 #
-If ( $Install )
+If ( $MSIName )
 {
 #
-$LocalLogFileType="_Install.log" # Set ActionType for Log File Path
-$global:LocalLogFilePath=$LocalLogFilePath+$MSIName+$LocalLogFileType # Construct Log File Path
+$Name=$MSIName
+$global:LocalFilePath="$Env:WinDir\temp\$MSIName" # Construct Local File Path
 #
 }
 #
-If ( $Uninstall )
+If ( $ExeName )
 {
 #
-$LocalLogFileType="_Uninstall.log" # Set ActionType for Log File Path
-$global:LocalLogFilePath=$LocalLogFilePath+$AppName+$LocalLogFileType # Construct Log File Path
+$Name=$ExeName
+$global:LocalFilePath="$Env:WinDir\temp\$ExeName" # Construct Local File Path
 #
 }
 #
@@ -97,6 +105,19 @@ $global:LocalLogFilePath=$LocalLogFilePath+$AppName+$LocalLogFileType # Construc
 #
 function Logging
 {
+#	
+If ( $Install )
+{
+	$LocalLogFileType="_Install.log" # Set ActionType for Log File Path
+	$global:LocalLogFilePath=$LocalLogFilePath+$Name+$LocalLogFileType # Construct Log File Path
+}
+#
+If ( $Uninstall )
+{
+	$LocalLogFileType="_Uninstall.log" # Set ActionType for Log File Path
+	$global:LocalLogFilePath=$LocalLogFilePath+$AppName+$LocalLogFileType # Construct Log File Path
+}
+#
 Start-Transcript $global:LocalLogFilePath # Start the logging
 Clear-Host # Clear Screen
 SectionEnd
@@ -228,15 +249,67 @@ else
 #
 ###############################################################################################################################################
 #
-# Uninstall Function
+# MSI Install Function
 #
-function Uninstall
+function MSIinstall
+{
+#
+Write-Host 'Attempting MSI Install'
+SectionEnd
+DownloadCheck
+Write-Host 'Running Command "MsiExec.exe /i '$global:LocalFilePath$global:Args /qn'"'
+Start-Process msiexec "/i $global:LocalFilePath$global:Args /qn" -wait
+SectionEnd
+Cleanup
+#
+}
+#
+###############################################################################################################################################
+#
+# EXE Install Function
+#
+function ExeInstall
+{
+#
+Write-Host 'Attempting EXE Install'
+SectionEnd
+DownloadCheck
+Write-Host 'Running Command "'$global:LocalFilePath$global:Args'"'
+Start-Process msiexec "$global:LocalFilePath$global:Args" -wait
+SectionEnd
+Cleanup
+#
+}
+#
+###############################################################################################################################################
+#
+# MSI Uninstall Function
+#
+function MSIUninstall
 {
 #
 [String]$UninstallCommand=(Write-Output $UninstallString.substring(12) /qn)
 #
-Write-Host 'Running Command "Start-Process msiexec.exe -Wait -ArgumentList'$UninstallCommand'"'
-Start-Process msiexec.exe -Wait -ArgumentList $UninstallCommand
+if ($UninstallCommand.ToLower().Contains("/i"))
+{
+	Write-Host 'Uninstall Command calls for MSIEXEC /I "'$UninstallString '"'
+	Write-Host 'Converting it to /X for UnInstall'
+	$UninstallCommand = $UninstallCommand.Replace('/I','/X')
+	Write-Host 'Running Command "Start-Process msiexec.exe -Wait -ArgumentList'$UninstallCommand'"'
+	Start-Process msiexec.exe -Wait -ArgumentList $UninstallCommand
+}
+#
+}
+#
+###############################################################################################################################################
+#
+# EXE Uninstall Function
+#
+function EXEUninstall
+{
+#
+Write-Host 'Running Command "'$UninstallString'"'
+Start-Process $UninstallString -Wait
 #
 }
 #
@@ -291,15 +364,21 @@ If ( $Install )
 	{
 		If ( $MSIName ) # Check MSI Name is set
 		{
-			DownloadCheck
-			Write-Host 'Running Command "MsiExec.exe /i '$global:LocalFilePath$global:MSIinstallArgs /qn'"'
-			Start-Process msiexec "/i $global:LocalFilePath$global:MSIinstallArgs /qn" -wait
-			SectionEnd
-			Cleanup
+			MSIinstall
 		}
 		else
 		{
-			Write-Host 'MSIName not set, cannot continue'
+			Write-Host 'MSI Name not set, MSI Install cannot continue'
+			SectionEnd
+			#
+			If ( $ExeName ) # Check App Name is set
+			{
+				ExeInstall
+			}
+			else
+			{
+				Write-Host 'EXE Name not set, EXE Install cannot continue'
+			}
 		}
 	}
 	else
@@ -318,7 +397,14 @@ If ( $Uninstall )
 		SectionEnd
 		if ($Global:UninstallString)
 		{
-			Uninstall
+			if ($Global:UninstallString.ToLower().Contains("msiexec"))
+			{
+				MSIUninstall
+			}
+			else
+			{
+				ExeUninstall
+			}
 		}
 		else
 		{
