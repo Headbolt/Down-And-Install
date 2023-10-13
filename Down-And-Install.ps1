@@ -30,7 +30,7 @@
 #
 # HISTORY
 #
-#   Version: 1.4 - 04/10/2023
+#   Version: 1.5 - 13/10/2023
 #
 #	19/09/2023 - V1.0 - Created by Headbolt
 #
@@ -46,6 +46,10 @@
 #
 #	04/10/2023 - V1.4 - Updated by Headbolt
 #				Added option for .EXE installers and Uninstallers
+#
+#	13/10/2023 - V1.5 - Updated by Headbolt
+#				Fixed a few syntax errors
+#				Also Issue Found where some Intune Deployments are putting "/qn" in the ExeName Variable, when it is not set !!!
 #
 ###############################################################################################################################################
 #
@@ -63,9 +67,9 @@ param (
 	[string]$AppName
 )
 #
-$global:ScriptVer="1.4" # Set ScriptVersion for logging
+$global:ScriptVer="1.5" # Set ScriptVersion for logging
 #
-$LocalLogFilePath="$Env:WinDir\temp\" # Set LogFile Patch
+$global:LocalLogFilePath="$Env:WinDir\temp\" # Set LogFile Patch
 $global:ScriptName="Application | Download and Install" # Set ScriptName for logging
 $global:URL=$URL # Pull URL into a Global Variable
 $global:MSIName=$MSIName # Pull MSIName into a Global Variable
@@ -77,22 +81,28 @@ If ( $Args )
 	$global:Args=" $Args" # Pull Arguments into a Global Variable, adding a leading space
 }
 #
-$global:LocalFilePath="$Env:WinDir\temp\$MSIName" # Construct Local File Path
-#
-If ( $MSIName )
+																			 
+ 
+If ( $global:MSIName )
 {
 #
-$Name=$MSIName
-$global:LocalFilePath="$Env:WinDir\temp\$MSIName" # Construct Local File Path
+	$global:Name=$global:MSIName
+	$global:LocalFilePath="$Env:WinDir\temp\$global:MSIName" # Construct Local File Path
 #
 }
 #
-If ( $ExeName )
+If ( $global:ExeName )
 {
 #
-$Name=$ExeName
-$global:LocalFilePath="$Env:WinDir\temp\$ExeName" # Construct Local File Path
-#
+	If ( "$global:ExeName" -eq "/qn" ) # Check if Machine interprets no ExeName incorrectly
+	{
+		$global:ExeName -eq ""
+	}
+	Else
+	{
+		$global:Name=$global:ExeName
+		$global:LocalFilePath="$Env:WinDir\temp\$global:ExeName" # Construct Local File Path
+	}
 }
 #
 ###############################################################################################################
@@ -109,13 +119,13 @@ function Logging
 If ( $Install )
 {
 	$LocalLogFileType="_Install.log" # Set ActionType for Log File Path
-	$global:LocalLogFilePath=$LocalLogFilePath+$Name+$LocalLogFileType # Construct Log File Path
+	$global:LocalLogFilePath=$global:LocalLogFilePath+$global:Name+$LocalLogFileType # Construct Log File Path
 }
 #
 If ( $Uninstall )
 {
 	$LocalLogFileType="_Uninstall.log" # Set ActionType for Log File Path
-	$global:LocalLogFilePath=$LocalLogFilePath+$AppName+$LocalLogFileType # Construct Log File Path
+	$global:LocalLogFilePath=$global:LocalLogFilePath+$global:AppName+$LocalLogFileType # Construct Log File Path
 }
 #
 Start-Transcript $global:LocalLogFilePath # Start the logging
@@ -153,6 +163,7 @@ if (Test-Path -Path $global:LocalFilePath)
 Else
 {
 	Write-Host 'Installer not detected, possible URL Expansion Needed'
+	SectionEnd
 	ExpandURL
 	SectionEnd
 	Download
@@ -275,7 +286,7 @@ Write-Host 'Attempting EXE Install'
 SectionEnd
 DownloadCheck
 Write-Host 'Running Command "'$global:LocalFilePath$global:Args'"'
-Start-Process msiexec "$global:LocalFilePath$global:Args" -wait
+Start-Process "$global:LocalFilePath$global:Args" -wait
 SectionEnd
 Cleanup
 #
@@ -362,7 +373,7 @@ If ( $Install )
 	SectionEnd
 	If ( $URL ) # Check URL is set
 	{
-		If ( $MSIName ) # Check MSI Name is set
+		If ( $global:MSIName ) # Check MSI Name is set
 		{
 			MSIinstall
 		}
@@ -371,7 +382,7 @@ If ( $Install )
 			Write-Host 'MSI Name not set, MSI Install cannot continue'
 			SectionEnd
 			#
-			If ( $ExeName ) # Check App Name is set
+			If ( $global:ExeName ) # Check App Name is set
 			{
 				ExeInstall
 			}
