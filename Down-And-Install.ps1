@@ -81,8 +81,6 @@ If ( $Args )
 	$global:Args=" $Args" # Pull Arguments into a Global Variable, adding a leading space
 }
 #
-																			 
- 
 If ( $global:MSIName )
 {
 #
@@ -306,9 +304,10 @@ if ($UninstallCommand.ToLower().Contains("/i"))
 	Write-Host 'Uninstall Command calls for MSIEXEC /I "'$UninstallString '"'
 	Write-Host 'Converting it to /X for UnInstall'
 	$UninstallCommand = $UninstallCommand.Replace('/I','/X')
-	Write-Host 'Running Command "Start-Process msiexec.exe -Wait -ArgumentList'$UninstallCommand'"'
-	Start-Process msiexec.exe -Wait -ArgumentList $UninstallCommand
 }
+#
+Write-Host 'Running Command "Start-Process msiexec.exe -Wait -ArgumentList'$UninstallCommand'"'
+Start-Process msiexec.exe -Wait -ArgumentList $UninstallCommand
 #
 }
 #
