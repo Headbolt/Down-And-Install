@@ -20,8 +20,8 @@
 #	Usage
 #		Down-And-Install.ps1 [-install | -uninstall] -MSIName <msi name> -ExeName <exe name> -Args <arguments> -URL <download url> -appname <app name>
 #			Note -InstallArgs is optional
-#		eg. Down-And-Install.ps1 -install -MSIName Zoom.msi -Args 'ACTID={aa}' -URL 'https://zoom.com/installer.msi?c="&"c='
-#		eg. Down-And-Install.ps1 -install -ExeName Zoom.exe -Args 'ACTID={aa}' -URL 'https://zoom.com/installer.msi?c="&"c='
+#		eg. Down-And-Install.ps1 -install -MSIName Zoom.msi -Arguments 'ACTID={aa}' -URL 'https://zoom.com/installer.msi?c="&"c='
+#		eg. Down-And-Install.ps1 -install -ExeName Zoom.exe -Arguments 'ACTID={aa}' -URL 'https://zoom.com/installer.msi?c="&"c='
 #				note special characters in the url will need double quoting with the entire url single quoted
 #
 #		eg. Down-And-Install.ps1 -uninstall -appname 'Zoom'
@@ -30,7 +30,7 @@
 #
 # HISTORY
 #
-#   Version: 1.5 - 13/10/2023
+#   Version: 1.7 - 24/05/2024
 #
 #	19/09/2023 - V1.0 - Created by Headbolt
 #
@@ -51,6 +51,13 @@
 #				Fixed a few syntax errors
 #				Also Issue Found where some Intune Deployments are putting "/qn" in the ExeName Variable, when it is not set !!!
 #
+#	14/02/2024 - V1.6 - Updated by Headbolt
+#				Fixed a few more syntax errors in specific situations
+#				Also added more information to the initial logging section.
+#
+#	24/05/2024 - V1.7 - Updated by Headbolt
+#				Fixed a few syntax errors in the usage section of the information.
+#
 ###############################################################################################################################################
 #
 #   DEFINE VARIABLES & READ IN PARAMETERS
@@ -62,12 +69,12 @@ param (
 	[switch]$Uninstall,
  	[string]$MSIName,
  	[string]$ExeName,
- 	[string]$Args,
+ 	[string]$Arguments,
  	[string]$URL,
 	[string]$AppName
 )
 #
-$global:ScriptVer="1.5" # Set ScriptVersion for logging
+$global:ScriptVer="1.7" # Set ScriptVersion for logging
 #
 $global:LocalLogFilePath="$Env:WinDir\temp\" # Set LogFile Patch
 $global:ScriptName="Application | Download and Install" # Set ScriptName for logging
@@ -76,22 +83,19 @@ $global:MSIName=$MSIName # Pull MSIName into a Global Variable
 $global:ExeName=$ExeName # Pull ExeName into a Global Variable 
 $global:AppName=$AppName # Pull Appname into a Global Variable 
 #
-If ( $Args )
+If ( $Arguments )
 {
-	$global:Args=" $Args" # Pull Arguments into a Global Variable, adding a leading space
+	$global:Arguments="$Arguments" # Pull Arguments into a Global Variable
 }
 #
 If ( $global:MSIName )
 {
-#
 	$global:Name=$global:MSIName
 	$global:LocalFilePath="$Env:WinDir\temp\$global:MSIName" # Construct Local File Path
-#
 }
 #
 If ( $global:ExeName )
 {
-#
 	If ( "$global:ExeName" -eq "/qn" ) # Check if Machine interprets no ExeName incorrectly
 	{
 		$global:ExeName -eq ""
@@ -132,6 +136,29 @@ SectionEnd
 Write-Host "Logging to $global:LocalLogFilePath"
 Write-Host ''# Outputting a Blank Line for Reporting Purposes
 Write-Host "Script Version $global:ScriptVer"
+Write-Host ''# Outputting a Blank Line for Reporting Purposes
+Write-Host 'Install Switch is'$Install
+Write-Host 'Uninstall Switch is'$Uninstall
+If ( $global:MSIName )
+{
+	Write-Host 'MSIName is'$global:MSIName
+}
+#
+If ( $global:ExeName )
+{
+	Write-Host 'ExeName is'$global:ExeName
+}
+#
+If ( $global:Arguments )
+{
+Write-Host 'Arguments are'$global:Arguments
+}
+#
+If ( $global:AppName )
+{
+	Write-Host 'MSIName is'$global:AppName
+}
+#
 }     
 #
 ###############################################################################################################################################
@@ -229,7 +256,6 @@ Write-Host "Searching for Uninstall String for $Global:AppName"
 Write-Host '' # Outputting a Blank Line for Reporting Purposes
 #
 $Global:UninstallString=(Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' | Foreach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.DisplayName -eq "$Global:AppName" } | Foreach-Object { Write-Output $_.UninstallString } )
-#
 if ($Global:UninstallString)
 { 
 	Write-Host "Found $UninstallString"
@@ -283,8 +309,8 @@ function ExeInstall
 Write-Host 'Attempting EXE Install'
 SectionEnd
 DownloadCheck
-Write-Host 'Running Command "'$global:LocalFilePath$global:Args'"'
-Start-Process "$global:LocalFilePath$global:Args" -wait
+Write-Host 'Running Command "'$global:LocalFilePath $global:Arguments'"'
+Start-Process "$global:LocalFilePath"$global:Arguments -wait
 SectionEnd
 Cleanup
 #
@@ -304,10 +330,9 @@ if ($UninstallCommand.ToLower().Contains("/i"))
 	Write-Host 'Uninstall Command calls for MSIEXEC /I "'$UninstallString '"'
 	Write-Host 'Converting it to /X for UnInstall'
 	$UninstallCommand = $UninstallCommand.Replace('/I','/X')
+	Write-Host 'Running Command "Start-Process msiexec.exe -Wait -ArgumentList'$UninstallCommand'"'
+	Start-Process msiexec.exe -Wait -ArgumentList $UninstallCommand
 }
-#
-Write-Host 'Running Command "Start-Process msiexec.exe -Wait -ArgumentList'$UninstallCommand'"'
-Start-Process msiexec.exe -Wait -ArgumentList $UninstallCommand
 #
 }
 #
