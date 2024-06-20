@@ -58,6 +58,10 @@
 #	24/05/2024 - V1.7 - Updated by Headbolt
 #				Fixed a few syntax errors in the usage section of the information.
 #
+#	20/06/2024 - V1.8 - Updated by Headbolt
+#				Fixed a possibility of a URL response being bigger than zero as it's a standard http response like a 403.
+#				Thus not triggering a URL expansion function
+#
 ###############################################################################################################################################
 #
 #   DEFINE VARIABLES & READ IN PARAMETERS
@@ -74,7 +78,7 @@ param (
 	[string]$AppName
 )
 #
-$global:ScriptVer="1.7" # Set ScriptVersion for logging
+$global:ScriptVer="1.8" # Set ScriptVersion for logging
 #
 $global:LocalLogFilePath="$Env:WinDir\temp\" # Set LogFile Patch
 $global:ScriptName="Application | Download and Install" # Set ScriptName for logging
@@ -173,9 +177,9 @@ SectionEnd
 #
 if (Test-Path -Path $global:LocalFilePath)
 {
-	If (-not((Get-Item $global:LocalFilePath).length -gt 0kb))
+	If (-not((Get-Item $global:LocalFilePath).length -gt 1kb))
 	{
-		Write-Host 'Installer is zero size, possible URL Expansion Needed'
+		Write-Host 'Installer is tiny, maybe just an HTTP response, possible URL Expansion Needed'
 		SectionEnd
 		Cleanup
 		SectionEnd
