@@ -18,7 +18,7 @@
 #
 # HISTORY
 #
-#   Version: 1.7 - 18/09/2023
+#   Version: 1.8 - 20/06/2024
 #
 #	05/10/2022 - V1.0 - Created by Headbolt
 #
@@ -49,15 +49,20 @@
 #							Updated some Syntax to fix errors
 #							Also added section to deal with certain kinds of download results
 #
+#	20/06/2024 - V1.8 - Updated by Headbolt
+#							Updated some Syntax around mounting images to allow for Spaces in Mounted folder names
+#							Also modded some syntax around command line switches
+#
 ###############################################################################################################################################
 #
 #   DEFINE VARIABLES & READ IN PARAMETERS
 #
 ###############################################################################################################################################
 #
+ScriptVer=v1.8
 DownloadURL=$4 # Grab the Download URL for the installer from JAMF variable #4 eg. https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/SophosInstall.zip
 AppInstallerCommand=$5 # Grab the Install Command, if needed from JAMF variable #5 eg. /Contents/MacOS/Sophos\ Installer
-AppInstallerSwitches=$6  # Grab the Installer Switches, if needed from JAMF variable #6 eg. --quiet
+AppInstallerSwitches="${6}"  # Grab the Installer Switches, if needed from JAMF variable #6 eg. --quiet
 #
 ScriptName="Application | Download and Install"
 MountVolume="" # Ensure The Mount Volume Variable is Blank at the outset
@@ -202,7 +207,7 @@ ImageMount(){
 /bin/echo # Outputting a Blank Line for Reporting Purposes
 #
 MountOutput=$( /usr/bin/hdiutil mount -private -noautoopen -noverify "$DownloadFile" -shadow ) # Mount the DMG
-MountedPath=$( /bin/echo "$MountOutput" | grep Volumes | awk '{print $3,$4,$5,$6,$7,$8,$9}' ) # Grab the path the DMG was mounted at
+MountedPath=$( /bin/echo "$MountOutput" | grep Volumes | awk '{print $2,$3,$4,$5,$6,$7,$8,$9}' ) # Grab the path the DMG was mounted at
 shopt -s extglob # Enable bash "Path Name Expansion"
 MountVolume="${MountedPath%%*( )}" # Check the Mounted Volume
 shopt -u extglob # Disable bash "Path Name Expansion"
@@ -273,7 +278,7 @@ if [[ $AppInstallerCommand == "" ]] # Check if installer Commands are Requested
 		#
 		chmod a+x "/tmp/$DownloadFileName/$InstallerApp/Contents/MacOS" # correcting permissions inside the installer
 		/bin/echo # Outputting a Blank Line for Reporting Purposes
-		/bin/echo 'Running Command "sudo "/tmp/'$DownloadFileName/${InstallerApp}$AppInstallerCommand $AppInstallerSwitches'"'
+		/bin/echo 'Running Command "sudo /tmp/'$DownloadFileName/${InstallerApp}$AppInstallerCommand $AppInstallerSwitches'"'
 		Install=$( sudo "/tmp/$DownloadFileName/$InstallerApp""$AppInstallerCommand" "$AppInstallerSwitches" 2>&1 ) # Install App
 		#
 		AlternateInstallMethod="" # Ensure The AlternateInstallMethod Variable is Blank at the outset
@@ -366,7 +371,7 @@ UnMount(){
 /bin/echo 'UnMounting volume "'$MountVolume'" from device "'$MountedDevice'"'
 /bin/echo # Outputting a Blank Line for Reporting Purposes
 /bin/echo 'Running Command "'umount $MountVolume'"'
-UnMountResult=$( umount $MountVolume )
+UnMountResult=$( umount "$MountVolume" )
 #
 if [[ $UnMountResult == "" ]] # check if $DownloadFileNamethere needs resetting for cleanup
 	then
@@ -456,6 +461,22 @@ sudo rm -rf "/tmp/$DownloadFileName"
 #
 ###############################################################################################################################################
 #
+# Script Start Function
+#
+ScriptStart(){
+#
+/bin/echo # Outputting a Blank Line for Reporting Purposes
+SectionEnd
+/bin/echo Starting Script '"'$ScriptName'"'
+/bin/echo Script Version '"'$ScriptVer'"'
+/bin/echo # Outputting a Blank Line for Reporting Purposes
+/bin/echo  ----------------------------------------------- # Outputting a Dotted Line for Reporting Purposes
+/bin/echo # Outputting a Blank Line for Reporting Purposes
+#
+}
+#
+###############################################################################################################################################
+#
 # Section End Function
 #
 SectionEnd(){
@@ -491,9 +512,7 @@ exit $ExitCode
 #
 ###############################################################################################################################################
 #
-/bin/echo # Outputting a Blank Line for Reporting Purposes
-SectionEnd
-#
+ScriptStart
 EvaluateDownload
 SectionEnd
 #
