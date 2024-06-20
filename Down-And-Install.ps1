@@ -30,7 +30,7 @@
 #
 # HISTORY
 #
-#   Version: 1.7 - 24/05/2024
+#   Version: 1.8 - 20/06/2024
 #
 #	19/09/2023 - V1.0 - Created by Headbolt
 #
