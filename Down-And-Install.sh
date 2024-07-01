@@ -18,7 +18,7 @@
 #
 # HISTORY
 #
-#   Version: 1.8 - 20/06/2024
+#   Version: 1.9 - 01/07/2024
 #
 #	05/10/2022 - V1.0 - Created by Headbolt
 #
@@ -53,13 +53,17 @@
 #							Updated some Syntax around mounting images to allow for Spaces in Mounted folder names
 #							Also modded some syntax around command line switches
 #
+#	01/07/2024 - V1.9 - Updated by Headbolt
+#							Updated some Syntax around mounting images to allow for new version command outputs in Mounted folder names
+#							Also changed how some variables are collected, to make them more reliable
+#
 ###############################################################################################################################################
 #
 #   DEFINE VARIABLES & READ IN PARAMETERS
 #
 ###############################################################################################################################################
 #
-ScriptVer=v1.8
+ScriptVer=v1.9
 DownloadURL=$4 # Grab the Download URL for the installer from JAMF variable #4 eg. https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/SophosInstall.zip
 AppInstallerCommand=$5 # Grab the Install Command, if needed from JAMF variable #5 eg. /Contents/MacOS/Sophos\ Installer
 AppInstallerSwitches="${6}"  # Grab the Installer Switches, if needed from JAMF variable #6 eg. --quiet
@@ -207,11 +211,10 @@ ImageMount(){
 /bin/echo # Outputting a Blank Line for Reporting Purposes
 #
 MountOutput=$( /usr/bin/hdiutil mount -private -noautoopen -noverify "$DownloadFile" -shadow ) # Mount the DMG
-MountedPath=$( /bin/echo "$MountOutput" | grep Volumes | awk '{print $2,$3,$4,$5,$6,$7,$8,$9}' ) # Grab the path the DMG was mounted at
-shopt -s extglob # Enable bash "Path Name Expansion"
-MountVolume="${MountedPath%%*( )}" # Check the Mounted Volume
-shopt -u extglob # Disable bash "Path Name Expansion"
 MountedDevice=$( /bin/echo "$MountOutput" | grep disk | head -1 | awk '{print $1}' ) # Find the Devie ID assigned to the mounted Volume
+diskutil list -plist $MountedDevice > /tmp/mountlist.plist # Use the mounted device to export data on the mounted Volume in a consistent format
+MountVolume=$(defaults read /tmp/mountlist.plist | grep MountPoint | rev | cut -c 3- | rev | cut -c 35-) # Extract the MountPoint data
+rm /tmp/mountlist.plist # tidy up the temp file used for process
 #
 if [ $? == 0 ] # Test the Mount was Successful
 	then
