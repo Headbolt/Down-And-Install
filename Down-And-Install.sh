@@ -18,7 +18,7 @@
 #
 # HISTORY
 #
-#   Version: 1.9 - 01/07/2024
+#   Version: 1.10 - 18/09/2024
 #
 #	05/10/2022 - V1.0 - Created by Headbolt
 #
@@ -57,13 +57,16 @@
 #							Updated some Syntax around mounting images to allow for new version command outputs in Mounted folder names
 #							Also changed how some variables are collected, to make them more reliable
 #
+#	18/09/2024 - V1.10 - Updated by Headbolt
+#							Updated some Syntax around mounting images again, to improve how some variables are collected, to make them more reliable
+#
 ###############################################################################################################################################
 #
 #   DEFINE VARIABLES & READ IN PARAMETERS
 #
 ###############################################################################################################################################
 #
-ScriptVer=v1.9
+ScriptVer=v1.10
 DownloadURL=$4 # Grab the Download URL for the installer from JAMF variable #4 eg. https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/SophosInstall.zip
 AppInstallerCommand=$5 # Grab the Install Command, if needed from JAMF variable #5 eg. /Contents/MacOS/Sophos\ Installer
 AppInstallerSwitches="${6}"  # Grab the Installer Switches, if needed from JAMF variable #6 eg. --quiet
@@ -213,7 +216,10 @@ ImageMount(){
 MountOutput=$( /usr/bin/hdiutil mount -private -noautoopen -noverify "$DownloadFile" -shadow ) # Mount the DMG
 MountedDevice=$( /bin/echo "$MountOutput" | grep disk | head -1 | awk '{print $1}' ) # Find the Devie ID assigned to the mounted Volume
 diskutil list -plist $MountedDevice > /tmp/mountlist.plist # Use the mounted device to export data on the mounted Volume in a consistent format
-MountVolume=$(defaults read /tmp/mountlist.plist | grep MountPoint | rev | cut -c 3- | rev | cut -c 35-) # Extract the MountPoint data
+#MountVolume=$(defaults read /tmp/mountlist.plist | grep MountPoint | rev | cut -c 3- | rev | cut -c 35-) # Extract the MountPoint data
+MountVolume=$(defaults read /tmp/mountlist.plist | grep MountPoint | tr '"' "\n" | grep Volumes) # Extract the MountPoint data
+
+
 rm /tmp/mountlist.plist # tidy up the temp file used for process
 #
 if [ $? == 0 ] # Test the Mount was Successful
