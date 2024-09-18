@@ -218,8 +218,6 @@ MountedDevice=$( /bin/echo "$MountOutput" | grep disk | head -1 | awk '{print $1
 diskutil list -plist $MountedDevice > /tmp/mountlist.plist # Use the mounted device to export data on the mounted Volume in a consistent format
 #MountVolume=$(defaults read /tmp/mountlist.plist | grep MountPoint | rev | cut -c 3- | rev | cut -c 35-) # Extract the MountPoint data
 MountVolume=$(defaults read /tmp/mountlist.plist | grep MountPoint | tr '"' "\n" | grep Volumes) # Extract the MountPoint data
-
-
 rm /tmp/mountlist.plist # tidy up the temp file used for process
 #
 if [ $? == 0 ] # Test the Mount was Successful
