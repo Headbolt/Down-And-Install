@@ -18,7 +18,7 @@
 #
 # HISTORY
 #
-#   Version: 1.10 - 18/09/2024
+#   Version: 1.11 - 19/11/2024
 #
 #	05/10/2022 - V1.0 - Created by Headbolt
 #
@@ -60,13 +60,17 @@
 #	18/09/2024 - V1.10 - Updated by Headbolt
 #							Updated some Syntax around mounting images again, to improve how some variables are collected, to make them more reliable
 #
+#	19/11/2024 - V1.11 - Updated by Headbolt
+#							Updated some logic to allow for hotlinks that use a "?fileid=" in them to select the file
+#							Also making allowances for some OS version list the mounted folders/devices different orders
+#
 ###############################################################################################################################################
 #
 #   DEFINE VARIABLES & READ IN PARAMETERS
 #
 ###############################################################################################################################################
 #
-ScriptVer=v1.10
+ScriptVer=v1.11
 DownloadURL=$4 # Grab the Download URL for the installer from JAMF variable #4 eg. https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/SophosInstall.zip
 AppInstallerCommand=$5 # Grab the Install Command, if needed from JAMF variable #5 eg. /Contents/MacOS/Sophos\ Installer
 AppInstallerSwitches="${6}"  # Grab the Installer Switches, if needed from JAMF variable #6 eg. --quiet
@@ -117,7 +121,15 @@ if [ $DownloadFileName == $DownloadExt ] # Check if link is a "HotLink"
         /bin/echo 'Assuming it is a "HotLink"'
         Hotlink="YES"
 	else
-		/bin/echo 'Installer is a .'$DownloadExt # Output the file extension for reporting
+		CheckForFileID=$(/bin/echo $DownloadExt | grep "?fileid=" ) # Search Download for "?fileid="
+		if [ $CheckForFileID != "" ] # Check if Download link uses "?fileid=", and if so, also assume it's a hotlink
+			then
+				/bin/echo 'This Download link does includes "?fileid="'
+				/bin/echo 'Assuming it is a "HotLink"'
+				Hotlink="YES"
+			else
+				/bin/echo 'Installer is a .'$DownloadExt # Output the file extension for reporting
+		fi
 fi
 IFS=' ' # Internal Field Seperator Delimiter is set to space ( )
 unset ifs # set the IFS back to normal
@@ -216,8 +228,20 @@ ImageMount(){
 MountOutput=$( /usr/bin/hdiutil mount -private -noautoopen -noverify "$DownloadFile" -shadow ) # Mount the DMG
 MountedDevice=$( /bin/echo "$MountOutput" | grep disk | head -1 | awk '{print $1}' ) # Find the Devie ID assigned to the mounted Volume
 diskutil list -plist $MountedDevice > /tmp/mountlist.plist # Use the mounted device to export data on the mounted Volume in a consistent format
-#MountVolume=$(defaults read /tmp/mountlist.plist | grep MountPoint | rev | cut -c 3- | rev | cut -c 35-) # Extract the MountPoint data
 MountVolume=$(defaults read /tmp/mountlist.plist | grep MountPoint | tr '"' "\n" | grep Volumes) # Extract the MountPoint data
+#
+if [[ $MountVolume == "" ]] # Check the reported Mount Point to see if it is blank, and if so try a different approach
+	then
+		/bin/echo 'Volume mountpoint reported at the "Top of the list" is "'$MountVolume'"'
+		/bin/echo # Outputting a Blank Line for Reporting Purposes
+        /bin/echo 'Retrying the "Bottom of the list"'
+		/bin/echo 'as some OS versions list in different orders'
+		MountedDevice=$( /bin/echo "$MountOutput" | grep disk | tail -1 | awk '{print $1}' ) # Find the Devie ID assigned to the mounted Volume
+		diskutil list -plist $MountedDevice > /tmp/mountlist.plist # Use the mounted device to export data on the mounted Volume in a consistent format
+		MountVolume=$(defaults read /tmp/mountlist.plist | grep MountPoint | tr '"' "\n" | grep Volumes) # Extract the MountPoint data
+		/bin/echo # Outputting a Blank Line for Reporting Purposes
+fi
+#
 rm /tmp/mountlist.plist # tidy up the temp file used for process
 #
 if [ $? == 0 ] # Test the Mount was Successful
@@ -382,8 +406,8 @@ UnMountResult=$( umount "$MountVolume" )
 #
 if [[ $UnMountResult == "" ]] # check if $DownloadFileNamethere needs resetting for cleanup
 	then
+		/bin/echo # Outputting a Blank Line for Reporting Purposes
 		/bin/echo 'UnMount of "'$MountVolume'" from "'$MountedDevice'" Confirmed Succesful' 
-        
 fi
 #
 }
