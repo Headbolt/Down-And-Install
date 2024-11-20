@@ -294,13 +294,13 @@ if [[ $( ls /tmp/$DownloadFileName | grep ".app" ) != "" ]] # Search for a .APP 
 		/bin/echo '.app found'
 		DownloadExt="app" # Set Variable for later checking
 		InstallerFound="Yes" # Set Variable for later checking
-	else
-		if [[ $( ls /tmp/$DownloadFileName | grep ".pkg" ) != "" ]] # Search for a .PKG file
-			then
-				/bin/echo '.pkg found'
-				DownloadExt="pkg" # Set Variable for later checking
-				InstallerFound="Yes" # Set Variable for later checking
-		fi
+fi
+#
+if [[ $( ls /tmp/$DownloadFileName | grep ".pkg" ) != "" ]] # Search for a .PKG file
+	then
+		/bin/echo '.pkg found'
+		DownloadExt="pkg" # Set Variable for later checking
+		InstallerFound="Yes" # Set Variable for later checking
 fi
 #
 if [[ $InstallerFound == "No" ]] # If no installer found then we will try again assuming an unzipped subfolder
@@ -313,14 +313,14 @@ if [[ $InstallerFound == "No" ]] # If no installer found then we will try again 
 				DownloadExt="app" # Set Variable for later checking
 				InstallerFound="Yes" # Set Variable for later checking
                 ZipAssumed="/$ZipAssumed" # Set Variable for later use in pushing to a subfolder
-			else
-				if [[ $( ls /tmp/${DownloadFileName}/$ZipAssumed | grep ".pkg" ) != "" ]] # Search for a .PKG in a potentially unzipped subfolder
-					then
-						/bin/echo '.pkg found'
-						DownloadExt="pkg" # Set Variable for later checking
-						InstallerFound="Yes" # Set Variable for later checking
-						ZipAssumed="/$ZipAssumed" # Set Variable for later use in pushing to a subfolder
-				fi
+		fi
+		#
+		if [[ $( ls /tmp/${DownloadFileName}/$ZipAssumed | grep ".pkg" ) != "" ]] # Search for a .PKG in a potentially unzipped subfolder
+			then
+				/bin/echo '.pkg found'
+				DownloadExt="pkg" # Set Variable for later checking
+				InstallerFound="Yes" # Set Variable for later checking
+				ZipAssumed="/$ZipAssumed" # Set Variable for later use in pushing to a subfolder
 		fi
 fi
 #
@@ -400,11 +400,11 @@ pkgInstall(){
 #
 if [ $Hotlink == "YES" ] # If link is a "HotLink" set a default name for Working Folder
 	then
-		/bin/echo 'Changing to Temporary Working Folder "/tmp/'${DownloadFileName}$ZipAssumed/temp'"'
-		cd "/tmp/${DownloadFileName}$ZipAssumed/temp"
+		/bin/echo 'Changing to Temporary Working Folder "/tmp/'$DownloadFileName/temp'"'
+		cd "/tmp/$DownloadFileName/temp"
         ls -al
 	else
-		pkgutil --expand ${DownloadFileName}$ZipAssumed "/tmp/${DownloadFileName}$ZipAssumed/temp" # Extract a copy of the app
+		pkgutil --expand $DownloadFile "/tmp/$DownloadFileName/temp" # Extract a copy of the app
 fi
 #
 /bin/echo 'Running Command "'sudo /usr/sbin/installer -pkg $DownloadFile -target /'"'
@@ -412,7 +412,7 @@ fi
 sudo /usr/sbin/installer -pkg $DownloadFile -target / # Install App
 #
 #Find the Name of the App as it will appear when installed
-AppName=$(cat "/tmp/${DownloadFileName}$ZipAssumed/temp/Distribution" | grep '<title>' | sed "s@.*<title>\(.*\)</title>.*@\1@" )
+AppName=$(cat "/tmp/$DownloadFileName/temp/Distribution" | grep '<title>' | sed "s@.*<title>\(.*\)</title>.*@\1@" )
 AppPath=$(/bin/echo $AppName.app ) # Translate into the full App name for the attribute section
 /bin/echo # Outputting a Blank Line for Reporting Purposes
 /bin/echo 'Clearing Attriubtes on Installed App'
@@ -426,7 +426,7 @@ if [[ "$AppOutput" == *"No such file"* ]] # Error Check incase installer App is 
         /bin/echo # Outputting a Blank Line for Reporting Purposes
         /bin/echo '"Checking each App inside "'$AppName'" and attempting to clear Attriubtes'
         /bin/echo # Outputting a Blank Line for Reporting Purposes
-		cat "/tmp/${DownloadFileName}$ZipAssumed/temp/Distribution" | grep 'title=' | sed -e 's/.*title="\([^"]*\)".*/\1/g' | while read IndividualApp
+		cat "/tmp/$DownloadFileName/temp/Distribution" | grep 'title=' | sed -e 's/.*title="\([^"]*\)".*/\1/g' | while read IndividualApp
 			do
             	/bin/echo # Outputting a Blank Line for Reporting Purposes
             	/bin/echo 'Running Command "xattr -rc /Applications/'$IndividualApp.app'"'
