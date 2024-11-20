@@ -10,7 +10,7 @@
 #   This Script is designed for use in JAMF and was designed to Download an App installer and install it
 #
 #	The Following Variables should be defined
-#	Variable 4 - Named "Download URL for Client Connector - eg. https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/SophosInstall.zip"
+#	Variable 4 - Named "Download URL for Software - eg. https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/SophosInstall.zip"
 #	Variable 5 - Named "Install Command - eg. /Contents/MacOS/Sophos Installer - OPTIONAL"
 #	Variable 6 - Named "Installer Switches - eg. --quiet - OPTIONAL"
 #
@@ -18,7 +18,7 @@
 #
 # HISTORY
 #
-#   Version: 1.11 - 19/11/2024
+#   Version: 1.12 - 20/11/2024
 #
 #	05/10/2022 - V1.0 - Created by Headbolt
 #
@@ -64,13 +64,18 @@
 #							Updated some logic to allow for hotlinks that use a "?fileid=" in them to select the file
 #							Also making allowances for some OS version list the mounted folders/devices different orders
 #
+#	20/11/2024 - V1.12 - Updated by Headbolt
+#							Updated some logic to allow for hotlinks that use a "?type=" in them to select the file
+#							Updated some logic to allow for subfolders when download is a .ZIP
+#							Also tidies up some syntax and wording 
+#
 ###############################################################################################################################################
 #
 #   DEFINE VARIABLES & READ IN PARAMETERS
 #
 ###############################################################################################################################################
 #
-ScriptVer=v1.11
+ScriptVer=v1.12
 DownloadURL=$4 # Grab the Download URL for the installer from JAMF variable #4 eg. https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/SophosInstall.zip
 AppInstallerCommand=$5 # Grab the Install Command, if needed from JAMF variable #5 eg. /Contents/MacOS/Sophos\ Installer
 AppInstallerSwitches="${6}"  # Grab the Installer Switches, if needed from JAMF variable #6 eg. --quiet
@@ -122,13 +127,21 @@ if [ $DownloadFileName == $DownloadExt ] # Check if link is a "HotLink"
         Hotlink="YES"
 	else
 		CheckForFileID=$(/bin/echo $DownloadExt | grep "?fileid=" ) # Search Download for "?fileid="
-		if [ $CheckForFileID != "" ] # Check if Download link uses "?fileid=", and if so, also assume it's a hotlink
+		if [[ $CheckForFileID != "" ]] # Check if Download link uses "?fileid=", and if so, also assume it's a hotlink
 			then
 				/bin/echo 'This Download link does includes "?fileid="'
 				/bin/echo 'Assuming it is a "HotLink"'
 				Hotlink="YES"
 			else
-				/bin/echo 'Installer is a .'$DownloadExt # Output the file extension for reporting
+				CheckForType=$(/bin/echo $DownloadExt | grep "?type=" ) # Search Download for "?type="
+				if [[ $CheckForType != "" ]] # Check if Download link uses "?type=", and if so, also assume it's a hotlink
+					then
+						/bin/echo 'This Download link does includes "?type="'
+						/bin/echo 'Assuming it is a "HotLink"'
+						Hotlink="YES"
+					else
+						/bin/echo 'Installer is a .'$DownloadExt # Output the file extension for reporting
+				fi
 		fi
 fi
 IFS=' ' # Internal Field Seperator Delimiter is set to space ( )
@@ -202,7 +215,7 @@ UnZip(){
 /bin/echo # Outputting a Blank Line for Reporting Purposes
 /bin/echo 'Running Command "'unzip $DownloadFile'"'
 /bin/echo # Outputting a Blank Line for Reporting Purposes
-unzip $DownloadFile
+unzip -q $DownloadFile
 /bin/echo # Outputting a Blank Line for Reporting Purposes
 /bin/echo 'Cleaning up original zip "/tmp/'${DownloadFileName}/$DownloadFile'"'
 /bin/echo # Outputting a Blank Line for Reporting Purposes
@@ -210,7 +223,7 @@ unzip $DownloadFile
 sudo rm -rf /tmp/${DownloadFileName}/$DownloadFile
 #
 SectionEnd
-PostExpansionIInstallerSearch
+PostExpansionInstallerSearch
 #
 }
 #
@@ -259,7 +272,7 @@ if [ $? == 0 ] # Test the Mount was Successful
 		# Set flag to indicate $DownloadFileName value will be changed, and preserve original value
 		PreMountedFileName=$DownloadFileName
 		DownloadFileName=$( echo ${DownloadFileName}/Mounted ) # Re-set $DownloadFileName to copied filed
-		PostExpansionIInstallerSearch
+		PostExpansionInstallerSearch
 	else
 		/bin/echo "There was an error mounting the DMG. Exit Code: $?"
 fi
@@ -269,21 +282,54 @@ fi
 #
 # Post Expansion Installer Search Function
 #
-PostExpansionIInstallerSearch(){
+PostExpansionInstallerSearch(){
 #
-		/bin/echo 'Checking copied files for installers'
-        /bin/echo # Outputting a Blank Line for Reporting Purposes
-		if [[ $( ls /tmp/$DownloadFileName | grep ".app" ) != "" ]]
-			then
-				/bin/echo '.app found'
-				DownloadExt="app"
-		fi
-		#
-		if [[ $( ls /tmp/$DownloadFileName | grep ".pkg" ) != "" ]]
+InstallerFound="No" # Set Variable to Initial "No" value for later checking
+ZipAssumed="" # Set Variable to blank, so if not needed it can be used later without affecting functions
+#
+/bin/echo 'Checking copied files for installers'
+/bin/echo # Outputting a Blank Line for Reporting Purposes
+if [[ $( ls /tmp/$DownloadFileName | grep ".app" ) != "" ]] # Search for a .APP file
+	then
+		/bin/echo '.app found'
+		DownloadExt="app" # Set Variable for later checking
+		InstallerFound="Yes" # Set Variable for later checking
+	else
+		if [[ $( ls /tmp/$DownloadFileName | grep ".pkg" ) != "" ]] # Search for a .PKG file
 			then
 				/bin/echo '.pkg found'
-				DownloadExt="pkg"
+				DownloadExt="pkg" # Set Variable for later checking
+				InstallerFound="Yes" # Set Variable for later checking
 		fi
+fi
+#
+if [[ $InstallerFound == "No" ]] # If no installer found then we will try again assuming an unzipped subfolder
+	then
+		ZipAssumed=$(/bin/echo $DownloadFile | rev | cut -c 5- | rev) # Grab the filename downloaded and strip off an assumes .zip
+		#
+		if [[ $( ls /tmp/${DownloadFileName}/$ZipAssumed | grep ".app" ) != "" ]] # Search for a .APP in a potentially unzipped subfolder
+			then
+				/bin/echo '.app found'
+				DownloadExt="app" # Set Variable for later checking
+				InstallerFound="Yes" # Set Variable for later checking
+                ZipAssumed="/$ZipAssumed" # Set Variable for later use in pushing to a subfolder
+			else
+				if [[ $( ls /tmp/${DownloadFileName}/$ZipAssumed | grep ".pkg" ) != "" ]] # Search for a .PKG in a potentially unzipped subfolder
+					then
+						/bin/echo '.pkg found'
+						DownloadExt="pkg" # Set Variable for later checking
+						InstallerFound="Yes" # Set Variable for later checking
+						ZipAssumed="/$ZipAssumed" # Set Variable for later use in pushing to a subfolder
+				fi
+		fi
+	else
+		/bin/echo 'No Installable App Type Found !!!'
+		ExitCode=1
+		SectionEnd
+		Cleanup
+		SectionEnd
+		ScriptEnd
+fi
 #
 }
 #
@@ -293,13 +339,13 @@ PostExpansionIInstallerSearch(){
 #
 InstallerApp(){
 #
-InstallerApp=$(ls "/tmp/$DownloadFileName" | grep ".app") # Search for the Installer .app
+InstallerApp=$(ls "/tmp/${DownloadFileName}$ZipAssumed" | grep ".app") # Search for the Installer .app
 /bin/echo 'Installing "'$InstallerApp'"'
 /bin/echo # Outputting a Blank Line for Reporting Purposes
 if [[ $AppInstallerCommand == "" ]] # Check if installer Commands are Requested
 	then
-		/bin/echo 'Running Command "'cp -R "/tmp/'$DownloadFileName/${InstallerApp}'" /Applications/'"'
-		cp -R "/tmp/$DownloadFileName/${InstallerApp}" /Applications/
+		/bin/echo 'Running Command "'cp -R "/tmp/'${DownloadFileName}$ZipAssumed/${InstallerApp}'" /Applications/'"'
+		cp -R "/tmp/${DownloadFileName}$ZipAssumed/${InstallerApp}" /Applications/
 	else
 		/bin/echo 'Installer command "'$AppInstallerCommand'" has been Requested'
         if [[ $AppInstallerSwitches != "" ]] # Check if installer Switches are Requested
@@ -307,10 +353,10 @@ if [[ $AppInstallerCommand == "" ]] # Check if installer Commands are Requested
 				/bin/echo 'AND Installer switches "'$AppInstallerSwitches'" have been Requested'
 		fi
 		#
-		chmod a+x "/tmp/$DownloadFileName/$InstallerApp/Contents/MacOS" # correcting permissions inside the installer
+		chmod a+x "/tmp/${DownloadFileName}$ZipAssumed/$InstallerApp/Contents/MacOS" # correcting permissions inside the installer
 		/bin/echo # Outputting a Blank Line for Reporting Purposes
-		/bin/echo 'Running Command "sudo /tmp/'$DownloadFileName/${InstallerApp}$AppInstallerCommand $AppInstallerSwitches'"'
-		Install=$( sudo "/tmp/$DownloadFileName/$InstallerApp""$AppInstallerCommand" "$AppInstallerSwitches" 2>&1 ) # Install App
+		/bin/echo 'Running Command "sudo /tmp/'${DownloadFileName}$ZipAssumed/${InstallerApp}$AppInstallerCommand $AppInstallerSwitches'"'
+		Install=$( sudo "/tmp/${DownloadFileName}$ZipAssumed/$InstallerApp""$AppInstallerCommand" ${AppInstallerSwitches} 2>&1 ) # Install App
 		#
 		AlternateInstallMethod="" # Ensure The AlternateInstallMethod Variable is Blank at the outset
 		#
@@ -332,7 +378,7 @@ if [[ $AppInstallerCommand == "" ]] # Check if installer Commands are Requested
 				/bin/echo # Outputting a Blank Line for Reporting Purposes
 				/bin/echo 'Attempting a different method of running the same command'
 				# To get around occasional tricky syntax with certain installers, pull install command into Variable
-				InstallCommand=$( /bin/echo "sudo /tmp/$DownloadFileName/${InstallerApp}${AppInstallerCommand} ${AppInstallerSwitches}" )
+				InstallCommand=$( /bin/echo "sudo /tmp/${DownloadFileName}$ZipAssumed/${InstallerApp}${AppInstallerCommand} ${AppInstallerSwitches}" )
 				/bin/echo # Outputting a Blank Line for Reporting Purposes
 				$InstallCommand # Run Install
 		fi
@@ -351,11 +397,11 @@ pkgInstall(){
 #
 if [ $Hotlink == "YES" ] # If link is a "HotLink" set a default name for Working Folder
 	then
-		/bin/echo 'Changing to Temporary Working Folder "/tmp/'$DownloadFileName/temp'"'
-		cd "/tmp/$DownloadFileName/temp"
+		/bin/echo 'Changing to Temporary Working Folder "/tmp/'${DownloadFileName}$ZipAssumed/temp'"'
+		cd "/tmp/${DownloadFileName}$ZipAssumed/temp"
         ls -al
 	else
-		pkgutil --expand $DownloadFile "/tmp/$DownloadFileName/temp" # Extract a copy of the app
+		pkgutil --expand ${DownloadFileName}$ZipAssumed "/tmp/${DownloadFileName}$ZipAssumed/temp" # Extract a copy of the app
 fi
 #
 /bin/echo 'Running Command "'sudo /usr/sbin/installer -pkg $DownloadFile -target /'"'
@@ -363,7 +409,7 @@ fi
 sudo /usr/sbin/installer -pkg $DownloadFile -target / # Install App
 #
 #Find the Name of the App as it will appear when installed
-AppName=$(cat "/tmp/$DownloadFileName/temp/Distribution" | grep '<title>' | sed "s@.*<title>\(.*\)</title>.*@\1@" )
+AppName=$(cat "/tmp/${DownloadFileName}$ZipAssumed/temp/Distribution" | grep '<title>' | sed "s@.*<title>\(.*\)</title>.*@\1@" )
 AppPath=$(/bin/echo $AppName.app ) # Translate into the full App name for the attribute section
 /bin/echo # Outputting a Blank Line for Reporting Purposes
 /bin/echo 'Clearing Attriubtes on Installed App'
@@ -377,7 +423,7 @@ if [[ "$AppOutput" == *"No such file"* ]] # Error Check incase installer App is 
         /bin/echo # Outputting a Blank Line for Reporting Purposes
         /bin/echo '"Checking each App inside "'$AppName'" and attempting to clear Attriubtes'
         /bin/echo # Outputting a Blank Line for Reporting Purposes
-		cat "/tmp/$DownloadFileName/temp/Distribution" | grep 'title=' | sed -e 's/.*title="\([^"]*\)".*/\1/g' | while read IndividualApp
+		cat "/tmp/${DownloadFileName}$ZipAssumed/temp/Distribution" | grep 'title=' | sed -e 's/.*title="\([^"]*\)".*/\1/g' | while read IndividualApp
 			do
             	/bin/echo # Outputting a Blank Line for Reporting Purposes
             	/bin/echo 'Running Command "xattr -rc /Applications/'$IndividualApp.app'"'
