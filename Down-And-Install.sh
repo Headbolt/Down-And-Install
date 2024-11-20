@@ -322,7 +322,10 @@ if [[ $InstallerFound == "No" ]] # If no installer found then we will try again 
 						ZipAssumed="/$ZipAssumed" # Set Variable for later use in pushing to a subfolder
 				fi
 		fi
-	else
+fi
+#
+if [[ $InstallerFound == "No" ]] # If still no installer found then error and exit
+	then
 		/bin/echo 'No Installable App Type Found !!!'
 		ExitCode=1
 		SectionEnd
