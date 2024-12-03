@@ -18,7 +18,7 @@
 #
 # HISTORY
 #
-#   Version: 1.12 - 20/11/2024
+#   Version: 1.13 - 03/12/2024
 #
 #	05/10/2022 - V1.0 - Created by Headbolt
 #
@@ -68,6 +68,8 @@
 #							Updated some logic to allow for hotlinks that use a "?type=" in them to select the file
 #							Updated some logic to allow for subfolders when download is a .ZIP
 #							Also tidies up some syntax and wording 
+#	03/12/2024 - V1.13 - Updated by Headbolt
+#							Updated some syntax when searching for ".app" to filter out config files like com.apple
 #
 ###############################################################################################################################################
 #
@@ -75,7 +77,7 @@
 #
 ###############################################################################################################################################
 #
-ScriptVer=v1.12
+ScriptVer=v1.13
 DownloadURL=$4 # Grab the Download URL for the installer from JAMF variable #4 eg. https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/SophosInstall.zip
 AppInstallerCommand=$5 # Grab the Install Command, if needed from JAMF variable #5 eg. /Contents/MacOS/Sophos\ Installer
 AppInstallerSwitches="${6}"  # Grab the Installer Switches, if needed from JAMF variable #6 eg. --quiet
@@ -342,7 +344,7 @@ fi
 #
 InstallerApp(){
 #
-InstallerApp=$(ls "/tmp/${DownloadFileName}$ZipAssumed" | grep ".app") # Search for the Installer .app
+InstallerApp=$(ls "/tmp/${DownloadFileName}$ZipAssumed" | grep ".app\b") # Search for the Installer .app, \b added in V1.13
 /bin/echo 'Installing "'$InstallerApp'"'
 /bin/echo # Outputting a Blank Line for Reporting Purposes
 if [[ $AppInstallerCommand == "" ]] # Check if installer Commands are Requested
