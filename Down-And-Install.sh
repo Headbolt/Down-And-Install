@@ -13,12 +13,13 @@
 #	Variable 4 - Named "Download URL for Software - eg. https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/SophosInstall.zip"
 #	Variable 5 - Named "Install Command - eg. /Contents/MacOS/Sophos Installer - OPTIONAL"
 #	Variable 6 - Named "Installer Switches - eg. --quiet - OPTIONAL"
+#	Variable 7 - Named "Calculated Variable - eg. AppInstallerSwitches=$(echo --userFolder $(defaults read "/Users/$3/) - OPTIONAL"
 #
 ###############################################################################################################################################
 #
 # HISTORY
 #
-#   Version: 1.13 - 03/12/2024
+#   Version: 1.14 - 26/02/2025
 #
 #	05/10/2022 - V1.0 - Created by Headbolt
 #
@@ -71,16 +72,22 @@
 #	03/12/2024 - V1.13 - Updated by Headbolt
 #							Updated some syntax when searching for ".app" to filter out config files like com.apple
 #
+#	26/02/2025 - V1.14 - Updated by Headbolt
+#							Added capability to allow for "Calculated Variables".
+#							This was added to allow certain variables to be overwritten or modified by running commands to define them
+#							by pulling data on the device directly	
+#
 ###############################################################################################################################################
 #
 #   DEFINE VARIABLES & READ IN PARAMETERS
 #
 ###############################################################################################################################################
 #
-ScriptVer=v1.13
+ScriptVer=v1.14
 DownloadURL=$4 # Grab the Download URL for the installer from JAMF variable #4 eg. https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/SophosInstall.zip
 AppInstallerCommand=$5 # Grab the Install Command, if needed from JAMF variable #5 eg. /Contents/MacOS/Sophos\ Installer
 AppInstallerSwitches="${6}"  # Grab the Installer Switches, if needed from JAMF variable #6 eg. --quiet
+CalculatedVariable="${7}" # Grab Variables to Calculate, from JAMF variable #7 eg. AppInstallerSwitches=$(echo --userFolder $(defaults read "/Users/$3/)
 #
 ScriptName="Application | Download and Install"
 MountVolume="" # Ensure The Mount Volume Variable is Blank at the outset
@@ -595,6 +602,18 @@ exit $ExitCode
 ###############################################################################################################################################
 #
 ScriptStart
+#
+if [[ "$CalculatedVariable" != "" ]]
+	then
+		/bin/echo 'Calculated Variable Detected.'
+		/bin/echo 'Evaluating ........'
+		/bin/echo # Outputting a Blank Line for Reporting Purposes
+		/bin/echo "Command being run is :"
+		/bin/echo '"'$CalculatedVariable'"'       
+		eval $CalculatedVariable
+		SectionEnd
+fi
+#
 EvaluateDownload
 SectionEnd
 #
