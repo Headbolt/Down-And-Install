@@ -7,7 +7,7 @@
 #	Down-And-Install.sh
 #	https://github.com/Headbolt/Down-And-Install
 #
-#   This Script is designed for use in JAMF and was designed to Download an App installer and install it
+#   This Script is designed for use in JAMF and was designed to Download an App installer and install it.
 #
 #	The Following Variables should be defined
 #	Variable 4 - Named "Download URL for Software - eg. https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/SophosInstall.zip"
