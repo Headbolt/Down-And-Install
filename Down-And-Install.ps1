@@ -18,8 +18,8 @@
 ###############################################################################################################################################
 #
 #	Usage
-#		Down-And-Install.ps1 [-install | -uninstall] -MSIName <msi name> -ExeName <exe name> -Args <arguments> -URL <download url> -appname <app name>
-#			Note -InstallArgs is optional
+#		Down-And-Install.ps1 [-install | -uninstall] -MSIName <msi name> -ExeName <exe name> -ArgsList <arguments> -URL <download url> -appname <app name>
+#			Note -ArgsList is optional
 #		eg. Down-And-Install.ps1 -install -MSIName Zoom.msi -Arguments 'ACTID={aa}' -URL 'https://zoom.com/installer.msi?c="&"c='
 #		eg. Down-And-Install.ps1 -install -ExeName Zoom.exe -Arguments 'ACTID={aa}' -URL 'https://zoom.com/installer.msi?c="&"c='
 #				note special characters in the url will need double quoting with the entire url single quoted
@@ -30,7 +30,7 @@
 #
 # HISTORY
 #
-#   Version: 1.8 - 20/06/2024
+#   Version: 2.0 - 14/07/2026
 #
 #	19/09/2023 - V1.0 - Created by Headbolt
 #
@@ -62,6 +62,12 @@
 #				Fixed a possibility of a URL response being bigger than zero as it's a standard http response like a 403.
 #				Thus not triggering a URL expansion function
 #
+#   20/06/2024 - V1.9 - Updated by Chris Smith
+#				Lines 228 & 230 updated to use Invoke-WebRequest instead of curl.exe as curl.exe was erroring with mailformed URL
+#
+#   14/07/2026 - V2.0 - Updated by Chris Smith
+#				Refactored variable "Args" to "ArgsList". This warning was being displayed an unexpected behaviour was occuring: "The Variable 'Args' is an automatic variable that is built into PowerShell"
+#
 ###############################################################################################################################################
 #
 #   DEFINE VARIABLES & READ IN PARAMETERS
@@ -73,12 +79,12 @@ param (
 	[switch]$Uninstall,
  	[string]$MSIName,
  	[string]$ExeName,
- 	[string]$Arguments,
+ 	[string]$ArgsList,
  	[string]$URL,
 	[string]$AppName
 )
 #
-$global:ScriptVer="1.8" # Set ScriptVersion for logging
+$global:ScriptVer="2.0" # Set ScriptVersion for logging
 #
 $global:LocalLogFilePath="$Env:WinDir\temp\" # Set LogFile Patch
 $global:ScriptName="Application | Download and Install" # Set ScriptName for logging
@@ -87,9 +93,9 @@ $global:MSIName=$MSIName # Pull MSIName into a Global Variable
 $global:ExeName=$ExeName # Pull ExeName into a Global Variable 
 $global:AppName=$AppName # Pull Appname into a Global Variable 
 #
-If ( $Arguments )
+If ( $ArgsList )
 {
-	$global:Arguments="$Arguments" # Pull Arguments into a Global Variable
+	$global:ArgsList="$ArgsList" # Pull Arguments into a Global Variable
 }
 #
 If ( $global:MSIName )
@@ -153,9 +159,9 @@ If ( $global:ExeName )
 	Write-Host 'ExeName is'$global:ExeName
 }
 #
-If ( $global:Arguments )
+If ( $global:ArgsList )
 {
-Write-Host 'Arguments are'$global:Arguments
+Write-Host 'Arguments are'$global:ArgsList
 }
 #
 If ( $global:AppName )
@@ -222,9 +228,9 @@ function Download
 {
 Write-Host 'Attempting Download'
 Write-Host ''# Outputting a Blank Line for Reporting Purposes
-Write-Host 'Running Command "curl.exe --output'$global:LocalFilePath' --url '$global:URL'"'
+Write-Host 'Running Command "Invoke-WebRequest -Uri '$global:URL' -OutFile '$global:LocalFilePath'"'
 Write-Host ''# Outputting a Blank Line for Reporting Purposes
-curl.exe --output $global:LocalFilePath --url $global:URL
+Invoke-WebRequest -Uri $global:URL -OutFile $global:LocalFilePath
 #
 }
 #
@@ -296,8 +302,8 @@ function MSIinstall
 Write-Host 'Attempting MSI Install'
 SectionEnd
 DownloadCheck
-Write-Host 'Running Command "MsiExec.exe /i '$global:LocalFilePath$global:Args /qn'"'
-Start-Process msiexec "/i $global:LocalFilePath$global:Args /qn" -wait
+Write-Host 'Running Command "MsiExec.exe /i '$global:LocalFilePath $global:ArgsList /qn'"'
+Start-Process msiexec "/i $global:LocalFilePath $global:ArgsList /qn" -wait
 SectionEnd
 Cleanup
 #
@@ -313,8 +319,8 @@ function ExeInstall
 Write-Host 'Attempting EXE Install'
 SectionEnd
 DownloadCheck
-Write-Host 'Running Command "'$global:LocalFilePath $global:Arguments'"'
-Start-Process "$global:LocalFilePath"$global:Arguments -wait
+Write-Host 'Running Command "'$global:LocalFilePath $global:ArgsList'"'
+Start-Process "$global:LocalFilePath"$global:ArgsList -wait
 SectionEnd
 Cleanup
 #
@@ -334,9 +340,10 @@ if ($UninstallCommand.ToLower().Contains("/i"))
 	Write-Host 'Uninstall Command calls for MSIEXEC /I "'$UninstallString '"'
 	Write-Host 'Converting it to /X for UnInstall'
 	$UninstallCommand = $UninstallCommand.Replace('/I','/X')
+}
 	Write-Host 'Running Command "Start-Process msiexec.exe -Wait -ArgumentList'$UninstallCommand'"'
 	Start-Process msiexec.exe -Wait -ArgumentList $UninstallCommand
-}
+ 
 #
 }
 #
